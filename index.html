@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Djedovina — Karta</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🫒</text></svg>">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+:root{--bg:#141F26;--panel:#1C2A33;--ink:#E9E0C9;--ink2:#A99F87;--line:#31434E;--olive:#93A467;--terra:#D6845A;--sea:#7FB4C4}
+*{box-sizing:border-box;margin:0}
+body{font:14px/1.45 system-ui,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.brand{font-family:Georgia,serif;font-weight:700;font-size:20px}
+.brand span{color:var(--olive)}
+#stats{color:var(--ink2);font-size:13px}
+.spacer{flex:1}
+button,.btn{background:transparent;border:1px solid var(--line);color:var(--ink2);padding:6px 10px;border-radius:6px;cursor:pointer;font:inherit}
+button.on{background:var(--olive);color:var(--bg);border-color:var(--olive)}
+main{flex:1;display:flex;min-height:0}
+#map{flex:1}
+aside{width:330px;background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:12px;display:none}
+aside.open{display:block}
+aside h2{font-size:15px;margin-bottom:8px}
+.notice{border-top:1px solid var(--line);padding:8px 0;font-size:13px}
+.notice:first-of-type{border-top:none}
+.notice .k{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600}
+.k.probate{background:#3A301E;color:#D9B25E}
+.k.correction-procedure{background:#3C2A1F;color:var(--terra)}
+.notice a{color:var(--sea)}
+.muted{color:var(--ink2)}
+#legend{position:absolute;bottom:26px;left:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;z-index:5}
+#legend div{display:flex;align-items:center;gap:8px;margin:3px 0}
+#legend i{width:14px;height:14px;border-radius:3px;display:inline-block}
+#gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
+#gate .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:28px;max-width:380px;text-align:center}
+#gate input{width:100%;margin:14px 0;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);font:inherit}
+#gate .go{background:var(--olive);color:var(--bg);border:none;font-weight:700;padding:10px 18px;border-radius:6px;cursor:pointer}
+#gate .err{color:#E08A6D;font-size:13px;margin-top:10px;min-height:18px}
+.maplibregl-popup-content{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;font:13px/1.5 system-ui,sans-serif;padding:12px 14px}
+.maplibregl-popup-content a{color:var(--sea)}
+.maplibregl-popup-close-button{color:var(--ink2);font-size:18px}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:var(--panel)}
+</style>
+</head>
+<body>
+<div id="gate"><div class="card">
+  <div class="brand" style="font-size:26px">Djedovina <span>· Karta</span></div>
+  <p class="muted" style="margin-top:8px">Enter the team access key to open the property map.</p>
+  <input id="keyIn" type="password" placeholder="access key" autocomplete="off">
+  <button class="go" id="keyGo">Open the map</button>
+  <div class="err" id="keyErr"></div>
+</div></div>
+
+<header>
+  <div class="brand">Djedovina <span>· Karta</span></div>
+  <span id="stats">loading…</span>
+  <div class="spacer"></div>
+  <button id="noticesBtn">Court notices</button>
+  <button id="refreshBtn" title="Reload data from the database">Refresh</button>
+  <button id="lockBtn" title="Forget the access key on this device">Lock</button>
+</header>
+<main>
+  <div id="map"></div>
+  <aside id="side"><h2>Live court notices <span class="muted" id="ncount"></span></h2><div id="nlist"></div></aside>
+</main>
+<div id="legend">
+  <div><i style="background:#5c6a75"></i> Not researched</div>
+  <div><i style="background:#7FB4C4"></i> Scouting (1–4)</div>
+  <div><i style="background:#93A467"></i> Family research (5)</div>
+  <div><i style="background:#D9B25E"></i> Contact (6–7)</div>
+  <div><i style="background:#D6845A"></i> Title works (8)</div>
+  <div><i style="background:#8FBF7F"></i> Deal (9–13)</div>
+  <div><i style="background:#E9E0C9"></i> Close & exit (14–15)</div>
+</div>
+
+<script>
+const ENDPOINT = "https://yunbpixnjktzaxbmdwad.supabase.co/functions/v1/map-data";
+const LS = "djedovina-map-key";
+let KEY = null; try { KEY = localStorage.getItem(LS); } catch (e) {}
+
+const gate = document.getElementById("gate");
+const keyErr = document.getElementById("keyErr");
+document.getElementById("keyGo").onclick = tryKey;
+document.getElementById("keyIn").addEventListener("keydown", e => { if (e.key === "Enter") tryKey(); });
+
+async function api(what, key) {
+  const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}&what=${what}`);
+  if (r.status === 401) throw new Error("unauthorized");
+  if (!r.ok) throw new Error("server " + r.status);
+  return r.json();
+}
+async function tryKey() {
+  const k = document.getElementById("keyIn").value.trim();
+  if (!k) return;
+  keyErr.textContent = "checking…";
+  try {
+    await api("status", k);
+    KEY = k; try { localStorage.setItem(LS, k); } catch (e) {}
+    keyErr.textContent = "";
+    boot();
+  } catch (e) {
+    keyErr.textContent = e.message === "unauthorized" ? "That key is not right." : "Could not reach the database: " + e.message;
+  }
+}
+document.getElementById("lockBtn").onclick = () => { try { localStorage.removeItem(LS); } catch (e) {} location.reload(); };
+
+let map, booted = false;
+function stageColor(s) {
+  if (s == null) return "#5c6a75";
+  if (s <= 4) return "#7FB4C4";
+  if (s === 5) return "#93A467";
+  if (s <= 7) return "#D9B25E";
+  if (s === 8) return "#D6845A";
+  if (s <= 13) return "#8FBF7F";
+  return "#E9E0C9";
+}
+async function boot() {
+  gate.style.display = "none";
+  if (booted) { return loadData(); }
+  booted = true;
+  map = new maplibregl.Map({
+    container: "map",
+    style: {
+      version: 8,
+      sources: { osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors" } },
+      layers: [{ id: "osm", type: "raster", source: "osm" }]
+    },
+    center: [16.524, 43.557], zoom: 13.5
+  });
+  map.addControl(new maplibregl.NavigationControl());
+  map.on("load", loadData);
+}
+async function loadData() {
+  try {
+    const [status, parcels, notices] = await Promise.all([api("status", KEY), api("parcels", KEY), api("notices", KEY)]);
+    document.getElementById("stats").textContent =
+      `${status.parcels ?? 0} parcels · tiles ${status.tiles_done ?? 0}/${status.tiles_total ?? 0} loaded · ${status.notices ?? 0} notices`;
+    for (const f of parcels.features) f.properties.color = stageColor(f.properties.stage);
+    if (map.getSource("parcels")) {
+      map.getSource("parcels").setData(parcels);
+    } else {
+      map.addSource("parcels", { type: "geojson", data: parcels });
+      map.addLayer({ id: "parcel-fill", type: "fill", source: "parcels",
+        paint: { "fill-color": ["get", "color"], "fill-opacity": 0.42 } });
+      map.addLayer({ id: "parcel-line", type: "line", source: "parcels",
+        paint: { "line-color": ["get", "color"], "line-width": 1.2 } });
+      map.on("click", "parcel-fill", e => {
+        const p = e.features[0].properties;
+        const g = `https://www.google.com/maps?q=${p.lat},${p.lon}`;
+        const sv = `https://www.google.com/maps?layer=c&cbll=${p.lat},${p.lon}`;
+        new maplibregl.Popup({ maxWidth: "300px" }).setLngLat(e.lngLat).setHTML(
+          `<b>Parcel ${esc(p.parcel_no)}</b> — ${esc(p.ko || "")}<br>` +
+          `${p.area_m2 ? Math.round(p.area_m2).toLocaleString() + " m²" : ""}` +
+          `${p.prospect && p.prospect !== "null" ? "<br>Prospect: <b>" + esc(p.prospect) + "</b> (stage " + p.stage + ")" : "<br><span style='color:#A99F87'>Not researched yet</span>"}` +
+          `<br>Owners recorded: ${p.owners_known ?? 0}` +
+          `<br><a href="${g}" target="_blank" rel="noopener">Google Maps</a> · <a href="${sv}" target="_blank" rel="noopener">Street View</a> · <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Land registry</a>`
+        ).addTo(map);
+      });
+      map.on("mouseenter", "parcel-fill", () => map.getCanvas().style.cursor = "pointer");
+      map.on("mouseleave", "parcel-fill", () => map.getCanvas().style.cursor = "");
+    }
+    const nl = document.getElementById("nlist");
+    document.getElementById("ncount").textContent = `(${notices.length} live)`;
+    nl.innerHTML = notices.map(n =>
+      `<div class="notice"><span class="k ${esc(n.kind)}">${n.kind === "probate" ? "heirs sought" : n.kind === "correction-procedure" ? "title correction" : esc(n.kind)}</span>` +
+      ` <span class="muted">${esc(n.published_at || "")}</span><br>` +
+      `<b>${esc(n.case_no || "")}</b> ${esc(n.title || "")}<br>` +
+      `<span class="muted">${esc(n.court || "")} · expires ${esc(n.expires_at || "")}</span>` +
+      `${n.source_url && !n.source_url.includes("#") ? ` · <a href="${esc(n.source_url)}" target="_blank" rel="noopener">record</a>` : ""}</div>`
+    ).join("") || `<p class="muted">No live notices.</p>`;
+  } catch (e) {
+    document.getElementById("stats").textContent = "load failed: " + e.message;
+  }
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+document.getElementById("noticesBtn").onclick = function () {
+  const s = document.getElementById("side"); s.classList.toggle("open"); this.classList.toggle("on");
+};
+document.getElementById("refreshBtn").onclick = loadData;
+if (KEY) { api("status", KEY).then(boot).catch(() => { gate.style.display = "flex"; }); } else { gate.style.display = "flex"; }
+</script>
+</body>
+</html>
