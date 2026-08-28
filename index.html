@@ -25,9 +25,14 @@ button.on{background:var(--olive);color:var(--bg);border-color:var(--olive)}
 #searchIn{width:100%;padding:7px 34px 7px 10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink)}
 #searchGo{position:absolute;right:2px;top:2px;bottom:2px;border:none;background:transparent;color:var(--olive);cursor:pointer;padding:0 9px;font-size:15px}
 #searchRes{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;z-index:40;max-height:280px;overflow:auto;display:none;box-shadow:0 6px 18px rgba(0,0,0,.4)}
-#searchRes div{padding:8px 10px;border-top:1px solid var(--line);cursor:pointer;font-size:13px}
-#searchRes div:first-child{border-top:none}
-#searchRes div:hover{background:var(--bg)}
+#searchRes div.srrow{padding:8px 10px;border-top:1px solid var(--line);cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
+#searchRes div.srrow:first-child{border-top:none}
+#searchRes div.srrow:hover{background:var(--bg)}
+#searchRes .srmain{flex:1;min-width:0}
+#searchRes .srdet{display:block;font-size:11.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#searchRes .srflag{flex:none;border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:12px;color:var(--ink2);background:transparent;cursor:pointer}
+#searchRes .srflag:hover{background:var(--olive);color:var(--bg);border-color:var(--olive)}
+#searchRes div.srnote{padding:8px 10px;font-size:12.5px}
 /* filter bar */
 #filters{display:none;gap:8px;align-items:center;padding:8px 14px;background:var(--panel2);border-bottom:1px solid var(--line);flex-wrap:wrap;font-size:13px}
 #filters.open{display:flex}
@@ -107,7 +112,7 @@ tr:hover td{background:var(--panel2)}
     <button data-v="sales">Sales</button>
   </nav>
   <div id="searchWrap">
-    <input id="searchIn" placeholder="Search an address or place (e.g. Put Polja, Klis)…" autocomplete="off">
+    <input id="searchIn" placeholder="Search address, building, or business (e.g. Bel Étage, Split)…" autocomplete="off">
     <button id="searchGo" title="Search">⌕</button>
     <div id="searchRes"></div>
   </div>
@@ -900,40 +905,84 @@ window.djSaveExtract = async function (pid, btn) {
   } catch (e) { btn.disabled = false; btn.textContent = "Failed — try again (" + e.message + ")"; }
 };
 
-/* ---------- address search (Nominatim) ---------- */
+/* ---------- place search (Photon fuzzy names + Nominatim addresses) ---------- */
 const sIn = document.getElementById("searchIn");
 const sRes = document.getElementById("searchRes");
-let sTimer = null;
+let sTimer = null, sSeq = 0;
 sIn.addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); if (e.key === "Escape") hideRes(); });
 sIn.addEventListener("input", () => { clearTimeout(sTimer); if (sIn.value.trim().length > 3) sTimer = setTimeout(doSearch, 700); });
 document.getElementById("searchGo").onclick = doSearch;
 document.addEventListener("click", e => { if (!e.target.closest("#searchWrap")) hideRes(); });
 function hideRes() { sRes.style.display = "none"; }
+function srIcon(key, val) {
+  if (key === "building" || val === "apartments" || val === "residential") return "🏢";
+  if (key === "shop") return "🏪";
+  if (key === "amenity") return "🏬";
+  if (key === "tourism" || val === "hotel" || val === "apartment") return "🏨";
+  if (key === "office") return "💼";
+  if (key === "highway" || key === "address" || key === "place") return "📍";
+  return "📍";
+}
 async function doSearch() {
   const q = sIn.value.trim();
   if (!q) return;
+  const seq = ++sSeq;
   sRes.style.display = "block";
-  sRes.innerHTML = `<div class="muted">Searching…</div>`;
-  try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=hr&viewbox=16.10,43.72,16.90,43.38&q=${encodeURIComponent(q)}`,
-      { headers: { "Accept-Language": "hr,en" } });
-    const items = await r.json();
-    if (!items.length) { sRes.innerHTML = `<div class="muted">Nothing found — try adding the town, e.g. "…, Klis".</div>`; return; }
-    sRes.innerHTML = "";
-    items.forEach(it => {
-      const d = document.createElement("div");
-      d.textContent = it.display_name;
-      d.onclick = () => { hideRes(); pickResult(it); };
-      sRes.appendChild(d);
-    });
-  } catch (e) {
-    sRes.innerHTML = `<div class="muted">Search failed: ${esc(e.message)}</div>`;
+  sRes.innerHTML = `<div class="srnote muted">Searching…</div>`;
+  // Photon: fuzzy, finds named buildings/businesses ("Belatage" → Bel Étage).
+  // Nominatim: exact addresses. Both free OSM services, queried together.
+  const c = map.getCenter();
+  const pPhoton = fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=${c.lat.toFixed(4)}&lon=${c.lng.toFixed(4)}&bbox=16.00,43.30,17.05,43.80`)
+    .then(r => r.json())
+    .then(d => (d.features || []).map(f => ({
+      label: f.properties.name || [f.properties.street, f.properties.housenumber].filter(Boolean).join(" ") || q,
+      detail: [f.properties.osm_value !== "yes" ? f.properties.osm_value : f.properties.osm_key,
+               [f.properties.street, f.properties.housenumber].filter(Boolean).join(" "),
+               f.properties.city || f.properties.county].filter(Boolean).join(" · "),
+      icon: srIcon(f.properties.osm_key, f.properties.osm_value),
+      lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0]
+    }))).catch(() => []);
+  const pNomi = fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=hr&viewbox=16.10,43.72,16.90,43.38&q=${encodeURIComponent(q)}`,
+    { headers: { "Accept-Language": "hr,en" } })
+    .then(r => r.json())
+    .then(items => (items || []).map(it => ({
+      label: it.display_name.split(",").slice(0, 2).join(",").trim(),
+      detail: it.display_name.split(",").slice(2, 5).join(",").trim(),
+      icon: srIcon(it.class, it.type),
+      lat: parseFloat(it.lat), lon: parseFloat(it.lon)
+    }))).catch(() => []);
+  const [ph, nm] = await Promise.all([pPhoton, pNomi]);
+  if (seq !== sSeq) return; // a newer search superseded this one
+  // merge: named places first, then addresses; drop near-duplicates (~60 m)
+  const results = [];
+  for (const r of [...ph, ...nm]) {
+    if (!isFinite(r.lat) || !isFinite(r.lon)) continue;
+    if (results.some(x => Math.abs(x.lat - r.lat) < 0.0006 && Math.abs(x.lon - r.lon) < 0.0008)) continue;
+    results.push(r);
+    if (results.length >= 8) break;
   }
+  if (!results.length) { sRes.innerHTML = `<div class="srnote muted">Nothing found — try adding the town, e.g. "…, Split".</div>`; return; }
+  sRes.innerHTML = "";
+  results.forEach((res, i) => {
+    const d = document.createElement("div");
+    d.className = "srrow";
+    d.innerHTML = `<span>${res.icon}</span><span class="srmain"><b>${esc(res.label)}</b><span class="srdet">${esc(res.detail || "")}</span></span><button class="srflag" title="Flag as a Djedovina prospect">⚑ Flag</button>`;
+    d.onclick = () => { hideRes(); pickResult(res); };
+    d.querySelector(".srflag").onclick = (ev) => {
+      ev.stopPropagation();
+      const btn = ev.currentTarget;
+      btn.textContent = "…";
+      djAdd(res.label + (res.detail ? " — " + res.detail : ""), res.lat, res.lon, btn);
+      map.flyTo({ center: [res.lon, res.lat], zoom: 17.2 });
+      setView("map");
+    };
+    sRes.appendChild(d);
+  });
 }
 async function pickResult(it) {
   setView("map");
-  const lat = parseFloat(it.lat), lon = parseFloat(it.lon);
-  const label = it.display_name.split(",").slice(0, 3).join(",").trim();
+  const lat = it.lat, lon = it.lon;
+  const label = it.label;
   map.flyTo({ center: [lon, lat], zoom: 17.2 });
   if (searchMarker) searchMarker.remove();
   searchMarker = new maplibregl.Marker({ color: "#D6845A" }).setLngLat([lon, lat]).addTo(map);
