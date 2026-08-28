@@ -8,24 +8,33 @@
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
-:root{--bg:#141F26;--panel:#1C2A33;--ink:#E9E0C9;--ink2:#A99F87;--line:#31434E;--olive:#93A467;--terra:#D6845A;--sea:#7FB4C4}
+:root{--bg:#141F26;--panel:#1C2A33;--panel2:#17242C;--ink:#E9E0C9;--ink2:#A99F87;--line:#31434E;--olive:#93A467;--terra:#D6845A;--sea:#7FB4C4;--good:#8FBF7F;--warn:#D9B25E;--crit:#E08A6D}
 *{box-sizing:border-box;margin:0}
 body{font:14px/1.45 system-ui,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column}
-header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
 .brand{font-family:Georgia,serif;font-weight:700;font-size:20px;white-space:nowrap}
 .brand span{color:var(--olive)}
-#stats{color:var(--ink2);font-size:13px}
+#stats{color:var(--ink2);font-size:12.5px}
 .spacer{flex:1}
-button,.btn{background:transparent;border:1px solid var(--line);color:var(--ink2);padding:6px 10px;border-radius:6px;cursor:pointer;font:inherit}
+button,.btn,select,input{font:inherit}
+button,.btn{background:transparent;border:1px solid var(--line);color:var(--ink2);padding:6px 10px;border-radius:6px;cursor:pointer}
 button.on{background:var(--olive);color:var(--bg);border-color:var(--olive)}
-#searchWrap{position:relative;flex:1;min-width:220px;max-width:420px}
-#searchIn{width:100%;padding:7px 34px 7px 10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);font:inherit}
+.vtabs{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px}
+.vtabs button{border:none;padding:6px 12px;border-radius:5px;font-weight:600}
+#searchWrap{position:relative;flex:1;min-width:200px;max-width:400px}
+#searchIn{width:100%;padding:7px 34px 7px 10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink)}
 #searchGo{position:absolute;right:2px;top:2px;bottom:2px;border:none;background:transparent;color:var(--olive);cursor:pointer;padding:0 9px;font-size:15px}
 #searchRes{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;z-index:40;max-height:280px;overflow:auto;display:none;box-shadow:0 6px 18px rgba(0,0,0,.4)}
 #searchRes div{padding:8px 10px;border-top:1px solid var(--line);cursor:pointer;font-size:13px}
 #searchRes div:first-child{border-top:none}
 #searchRes div:hover{background:var(--bg)}
-main{flex:1;display:flex;min-height:0}
+#filters{display:none;gap:8px;align-items:center;padding:8px 14px;background:var(--panel2);border-bottom:1px solid var(--line);flex-wrap:wrap;font-size:13px}
+#filters.open{display:flex}
+#filters select,#filters input{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:6px 8px}
+#filters input[type=number]{width:96px}
+#filters label{color:var(--ink2);display:flex;gap:6px;align-items:center}
+#fcount{color:var(--olive);font-weight:600}
+main{flex:1;display:flex;min-height:0;position:relative}
 #map{flex:1}
 aside{width:330px;background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:12px;display:none}
 aside.open{display:block}
@@ -33,18 +42,33 @@ aside h2{font-size:15px;margin-bottom:8px}
 .notice{border-top:1px solid var(--line);padding:8px 0;font-size:13px}
 .notice:first-of-type{border-top:none}
 .notice .k{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600}
-.k.probate{background:#3A301E;color:#D9B25E}
+.k.probate{background:#3A301E;color:var(--warn)}
 .k.correction-procedure{background:#3C2A1F;color:var(--terra)}
 .notice a{color:var(--sea)}
 .muted{color:var(--ink2)}
 #legend{position:absolute;bottom:26px;left:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;z-index:5}
 #legend div{display:flex;align-items:center;gap:8px;margin:3px 0}
 #legend i{width:14px;height:14px;border-radius:3px;display:inline-block}
+.oview{position:absolute;inset:0;background:var(--bg);z-index:8;overflow:auto;padding:16px;display:none}
+.oview.open{display:block}
+.oview h2{font-size:17px;margin-bottom:4px}
+.oview .sub{color:var(--ink2);font-size:13px;margin-bottom:14px}
+table{border-collapse:collapse;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13.5px}
+th{background:var(--panel2);color:var(--ink2);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
+tr:hover td{background:var(--pan2)}
+tr:hover td{background:var(--panel2)}
+.tblwrap{overflow-x:auto;border-radius:8px}
+.stgsel{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 6px;max-width:210px}
+.chip{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-size:12px;margin:1px 2px 1px 0;white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+.loc{cursor:pointer;color:var(--sea)}
+.empty{padding:26px;text-align:center;color:var(--ink2);border:1px dashed var(--line);border-radius:8px;background:var(--panel)}
 #gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
 #gate .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:28px;max-width:380px;text-align:center}
-#gate input{width:100%;margin:14px 0;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);font:inherit}
+#gate input{width:100%;margin:14px 0;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink)}
 #gate .go{background:var(--olive);color:var(--bg);border:none;font-weight:700;padding:10px 18px;border-radius:6px;cursor:pointer}
-#gate .err{color:#E08A6D;font-size:13px;margin-top:10px;min-height:18px}
+#gate .err{color:var(--crit);font-size:13px;margin-top:10px;min-height:18px}
 .maplibregl-popup-content{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;font:13px/1.5 system-ui,sans-serif;padding:12px 14px;max-width:300px}
 .maplibregl-popup-content a{color:var(--sea)}
 .maplibregl-popup-content .add{margin-top:8px;background:var(--olive);color:var(--bg);border:none;font-weight:700;padding:6px 12px;border-radius:6px;cursor:pointer;font:inherit}
@@ -63,6 +87,11 @@ aside h2{font-size:15px;margin-bottom:8px}
 
 <header>
   <div class="brand">Djedovina <span>· Karta</span></div>
+  <nav class="vtabs" id="vtabs">
+    <button data-v="map" class="on">Map</button>
+    <button data-v="ops">Operations</button>
+    <button data-v="sales">Sales</button>
+  </nav>
   <div id="searchWrap">
     <input id="searchIn" placeholder="Search an address or place (e.g. Put Polja, Klis)…" autocomplete="off">
     <button id="searchGo" title="Search">⌕</button>
@@ -70,14 +99,57 @@ aside h2{font-size:15px;margin-bottom:8px}
   </div>
   <span id="stats">loading…</span>
   <div class="spacer"></div>
+  <button id="filtersBtn">Filters</button>
   <button id="noticesBtn">Court notices</button>
   <button id="refreshBtn" title="Reload data from the database">Refresh</button>
   <button id="lockBtn" title="Forget the access key on this device">Lock</button>
 </header>
+
+<div id="filters">
+  <label>Cadastral municipality
+    <select id="fKo"><option value="">All</option></select></label>
+  <label>Status
+    <select id="fStage">
+      <option value="">All parcels</option>
+      <option value="none">Not researched</option>
+      <option value="tracked">Tracked (any stage)</option>
+      <option value="1-4">Scouting 1–4</option>
+      <option value="5-5">Family research 5</option>
+      <option value="6-7">Contact 6–7</option>
+      <option value="8-8">Title works 8</option>
+      <option value="9-13">Deal 9–13</option>
+      <option value="14-15">Close & exit 14–15</option>
+    </select></label>
+  <label>Area m² <input id="fMin" type="number" placeholder="min"> – <input id="fMax" type="number" placeholder="max"></label>
+  <label>Owners recorded
+    <select id="fOwn">
+      <option value="">Any</option>
+      <option value="0">None yet</option>
+      <option value="1">1 or more</option>
+      <option value="5">5 or more</option>
+      <option value="10">10 or more</option>
+    </select></label>
+  <button id="fClear">Clear</button>
+  <span id="fcount"></span>
+</div>
+
 <main>
   <div id="map"></div>
   <aside id="side"><h2>Live court notices <span class="muted" id="ncount"></span></h2><div id="nlist"></div></aside>
+
+  <div class="oview" id="opsView">
+    <h2>Operations — the working pipeline</h2>
+    <p class="sub">Every prospect, whatever its stage. Change a stage right here; it is journalled automatically. 📍 jumps to it on the map.</p>
+    <div id="opsBody"></div>
+  </div>
+
+  <div class="oview" id="salesView">
+    <h2>Sales — deals and exits</h2>
+    <p class="sub">Prospects from valuation (stage 9) through exit (stage 15): the money book.</p>
+    <div id="salesBody"></div>
+  </div>
 </main>
+
 <div id="legend">
   <div><i style="background:#5c6a75"></i> Not researched</div>
   <div><i style="background:#7FB4C4"></i> Scouting (1–4)</div>
@@ -121,6 +193,9 @@ async function tryKey() {
 document.getElementById("lockBtn").onclick = () => { try { localStorage.removeItem(LS); } catch (e) {} location.reload(); };
 
 let map, booted = false, searchMarker = null;
+let allParcels = { type: "FeatureCollection", features: [] };
+let opsData = [];
+const STAGE_NAMES = {1:"Territory chosen",2:"Extract read",3:"Notice watch",4:"Site visit",5:"Family tree",6:"First contact",7:"Heir eligibility",8:"Title fixing",9:"Valuation",10:"Pre-contract",11:"Share purchases",12:"Contract & registration",13:"Tax",14:"Consolidation",15:"Exit / hold"};
 function stageColor(s) {
   if (s == null) return "#5c6a75";
   if (s <= 4) return "#7FB4C4";
@@ -131,7 +206,30 @@ function stageColor(s) {
   return "#E9E0C9";
 }
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function fmtN(n) { return n == null ? "—" : Math.round(n).toLocaleString(); }
 
+/* ---------- views ---------- */
+const vtabs = document.getElementById("vtabs");
+vtabs.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  setView(b.dataset.v);
+});
+function setView(v) {
+  vtabs.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  document.getElementById("opsView").classList.toggle("open", v === "ops");
+  document.getElementById("salesView").classList.toggle("open", v === "sales");
+  document.getElementById("legend").style.display = v === "map" ? "block" : "none";
+  if (v === "ops") renderOps();
+  if (v === "sales") renderSales();
+}
+window.djLocate = function (lat, lon) {
+  setView("map");
+  map.flyTo({ center: [lon, lat], zoom: 17 });
+  if (searchMarker) searchMarker.remove();
+  searchMarker = new maplibregl.Marker({ color: "#D6845A" }).setLngLat([lon, lat]).addTo(map);
+};
+
+/* ---------- boot & data ---------- */
 async function boot() {
   gate.style.display = "none";
   if (booted) { return loadData(); }
@@ -148,25 +246,26 @@ async function boot() {
   map.addControl(new maplibregl.NavigationControl());
   map.on("load", loadData);
 }
-
-/* ---------- data ---------- */
 async function loadData() {
   try {
-    const [status, parcels, notices, pins] = await Promise.all([
-      api("what=status", KEY), api("what=parcels", KEY), api("what=notices", KEY), api("what=pins", KEY)
+    const [status, parcels, notices, pins, ops] = await Promise.all([
+      api("what=status", KEY), api("what=parcels", KEY), api("what=notices", KEY), api("what=pins", KEY), api("what=ops", KEY)
     ]);
+    opsData = ops || [];
     document.getElementById("stats").textContent =
-      `${status.parcels ?? 0} parcels · tiles ${status.tiles_done ?? 0}/${status.tiles_total ?? 0} loaded · ${status.notices ?? 0} notices`;
+      `${status.parcels ?? 0} parcels · tiles ${status.tiles_done ?? 0}/${status.tiles_total ?? 0} · ${opsData.length} prospects · ${status.notices ?? 0} notices`;
     for (const f of parcels.features) f.properties.color = stageColor(f.properties.stage);
+    allParcels = parcels;
+    buildKoOptions();
     const pinGeo = { type: "FeatureCollection", features: (pins || []).map(p => ({
       type: "Feature", geometry: { type: "Point", coordinates: [p.lon, p.lat] },
       properties: { name: p.name, stage: p.stage, address: p.address || "" }
     })) };
     if (map.getSource("parcels")) {
-      map.getSource("parcels").setData(parcels);
+      applyFilters();
       map.getSource("pins").setData(pinGeo);
     } else {
-      map.addSource("parcels", { type: "geojson", data: parcels });
+      map.addSource("parcels", { type: "geojson", data: allParcels });
       map.addLayer({ id: "parcel-fill", type: "fill", source: "parcels",
         paint: { "fill-color": ["get", "color"], "fill-opacity": 0.42 } });
       map.addLayer({ id: "parcel-line", type: "line", source: "parcels",
@@ -180,20 +279,70 @@ async function loadData() {
           `<b>${esc(p.name)}</b><br><span class="muted">Saved pin · stage ${esc(p.stage)}</span>` +
           (p.address ? `<br>${esc(p.address)}` : "")).addTo(map);
       });
-      map.on("click", "parcel-fill", e => {
-        const p = e.features[0].properties;
-        openParcelPopup(p, e.lngLat);
-      });
+      map.on("click", "parcel-fill", e => openParcelPopup(e.features[0].properties, e.lngLat));
       for (const l of ["parcel-fill", "pin-dots"]) {
         map.on("mouseenter", l, () => map.getCanvas().style.cursor = "pointer");
         map.on("mouseleave", l, () => map.getCanvas().style.cursor = "");
       }
+      applyFilters();
     }
     renderNotices(notices);
+    if (document.getElementById("opsView").classList.contains("open")) renderOps();
+    if (document.getElementById("salesView").classList.contains("open")) renderSales();
   } catch (e) {
     document.getElementById("stats").textContent = "load failed: " + e.message;
   }
 }
+
+/* ---------- filters ---------- */
+document.getElementById("filtersBtn").onclick = function () {
+  document.getElementById("filters").classList.toggle("open");
+  this.classList.toggle("on");
+};
+for (const id of ["fKo", "fStage", "fOwn"]) document.getElementById(id).addEventListener("change", applyFilters);
+for (const id of ["fMin", "fMax"]) document.getElementById(id).addEventListener("input", () => { clearTimeout(window.__ft); window.__ft = setTimeout(applyFilters, 400); });
+document.getElementById("fClear").onclick = () => {
+  for (const id of ["fKo", "fStage", "fOwn"]) document.getElementById(id).value = "";
+  document.getElementById("fMin").value = ""; document.getElementById("fMax").value = "";
+  applyFilters();
+};
+function buildKoOptions() {
+  const sel = document.getElementById("fKo");
+  const cur = sel.value;
+  const kos = [...new Set(allParcels.features.map(f => f.properties.ko).filter(Boolean))].sort();
+  sel.innerHTML = `<option value="">All</option>` + kos.map(k => `<option ${k === cur ? "selected" : ""}>${esc(k)}</option>`).join("");
+}
+function applyFilters() {
+  if (!map || !map.getSource("parcels")) return;
+  const ko = document.getElementById("fKo").value;
+  const st = document.getElementById("fStage").value;
+  const min = parseFloat(document.getElementById("fMin").value);
+  const max = parseFloat(document.getElementById("fMax").value);
+  const own = document.getElementById("fOwn").value;
+  const feats = allParcels.features.filter(f => {
+    const p = f.properties;
+    if (ko && p.ko !== ko) return false;
+    if (st === "none" && p.stage != null) return false;
+    if (st === "tracked" && p.stage == null) return false;
+    if (st && st !== "none" && st !== "tracked") {
+      const [a, b] = st.split("-").map(Number);
+      if (p.stage == null || p.stage < a || p.stage > b) return false;
+    }
+    if (isFinite(min) && !(p.area_m2 >= min)) return false;
+    if (isFinite(max) && !(p.area_m2 <= max)) return false;
+    if (own !== "") {
+      const n = p.owners_known ?? 0;
+      if (own === "0" && n !== 0) return false;
+      if (own !== "0" && n < parseInt(own)) return false;
+    }
+    return true;
+  });
+  map.getSource("parcels").setData({ type: "FeatureCollection", features: feats });
+  document.getElementById("fcount").textContent =
+    feats.length === allParcels.features.length ? `${feats.length} parcels` : `${feats.length} of ${allParcels.features.length} parcels`;
+}
+
+/* ---------- notices ---------- */
 function renderNotices(notices) {
   const nl = document.getElementById("nlist");
   document.getElementById("ncount").textContent = `(${notices.length} live)`;
@@ -205,21 +354,21 @@ function renderNotices(notices) {
     `${n.source_url && !n.source_url.includes("#") ? ` · <a href="${esc(n.source_url)}" target="_blank" rel="noopener">record</a>` : ""}</div>`
   ).join("") || `<p class="muted">No live notices.</p>`;
 }
+
+/* ---------- parcel popup / add / stage ---------- */
 function openParcelPopup(p, lngLat) {
   const g = `https://www.google.com/maps?q=${p.lat},${p.lon}`;
   const sv = `https://www.google.com/maps?layer=c&cbll=${p.lat},${p.lon}`;
   const hasProspect = p.prospect && p.prospect !== "null";
   new maplibregl.Popup({ maxWidth: "300px" }).setLngLat(lngLat).setHTML(
     `<b>Parcel ${esc(p.parcel_no)}</b> — ${esc(p.ko || "")}<br>` +
-    `${p.area_m2 ? Math.round(p.area_m2).toLocaleString() + " m²" : ""}` +
+    `${p.area_m2 ? fmtN(p.area_m2) + " m²" : ""}` +
     `${hasProspect ? "<br>Prospect: <b>" + esc(p.prospect) + "</b> (stage " + p.stage + ")" : "<br><span style='color:#A99F87'>Not researched yet</span>"}` +
     `<br>Owners recorded: ${p.owners_known ?? 0}` +
     `<br><a href="${g}" target="_blank" rel="noopener">Google Maps</a> · <a href="${sv}" target="_blank" rel="noopener">Street View</a> · <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Land registry</a>` +
     (!hasProspect ? `<br><button class="add" onclick="djAdd('Parcel ${esc(p.parcel_no)}, ${esc(p.ko || "")}', ${p.lat}, ${p.lon}, this)">+ Add to Djedovina</button>` : "")
   ).addTo(map);
 }
-
-/* ---------- add prospect ---------- */
 window.djAdd = async function (label, lat, lon, btn) {
   if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
   try {
@@ -230,8 +379,71 @@ window.djAdd = async function (label, lat, lon, btn) {
     if (btn) { btn.disabled = false; btn.textContent = "Failed — try again (" + e.message + ")"; }
   }
 };
+window.djStage = async function (id, stage, sel) {
+  sel.disabled = true;
+  try {
+    await api(`what=set_stage&prospect=${id}&stage=${stage}`, KEY);
+    await loadData();
+  } catch (e) { alert("Stage change failed: " + e.message); }
+  sel.disabled = false;
+};
 
-/* ---------- address search (OpenStreetMap Nominatim, biased to the Split area) ---------- */
+/* ---------- operations view ---------- */
+function stageSelect(o) {
+  return `<select class="stgsel" onchange="djStage(${o.id}, this.value, this)">` +
+    Object.entries(STAGE_NAMES).map(([n, l]) => `<option value="${n}" ${+n === o.stage ? "selected" : ""}>${n}. ${l}</option>`).join("") +
+    `</select>`;
+}
+function parcelChips(o) {
+  if (!o.parcels || !o.parcels.length) return `<span class="muted">pin only — parcel loads automatically</span>`;
+  return o.parcels.map(p => `<span class="chip">${esc(p.parcel_no)} · ${esc(p.ko || "")} · ${fmtN(p.area_m2)} m²</span>`).join("");
+}
+function renderOps() {
+  const el = document.getElementById("opsBody");
+  if (!opsData.length) { el.innerHTML = `<div class="empty">No prospects yet — add them from the map with search or by clicking a parcel.</div>`; return; }
+  el.innerHTML = `<div class="tblwrap"><table><thead><tr>
+    <th>Prospect</th><th>Stage</th><th>Parcels</th><th class="num">Owners on title</th>
+    <th>Tasks</th><th class="num">Spent / budget €</th><th>Last note</th><th></th>
+  </tr></thead><tbody>` + opsData.map(o => `<tr>
+    <td><b>${esc(o.name)}</b>${o.address && o.address !== o.name ? `<br><span class="muted">${esc(o.address)}</span>` : ""}</td>
+    <td>${stageSelect(o)}</td>
+    <td>${parcelChips(o)}</td>
+    <td class="num">${o.owners_count ?? "—"}</td>
+    <td>${o.open_tasks ? `${o.open_tasks} open${o.next_due ? " · next " + esc(o.next_due) : ""}` : `<span class="muted">none</span>`}</td>
+    <td class="num">${fmtN(o.spent)} / ${fmtN(o.budget)}</td>
+    <td class="muted" style="max-width:260px">${esc(o.last_note || "")}</td>
+    <td>${o.lat ? `<span class="loc" onclick="djLocate(${o.lat}, ${o.lon})" title="Show on the map">📍</span>` : ""}</td>
+  </tr>`).join("") + `</tbody></table></div>`;
+}
+
+/* ---------- sales view ---------- */
+function renderSales() {
+  const el = document.getElementById("salesBody");
+  const deals = opsData.filter(o => o.stage >= 9);
+  if (!deals.length) {
+    el.innerHTML = `<div class="empty">Nothing in deal stages yet. When a prospect reaches stage 9 (Valuation) it appears here — with its parcels, budget line and closing steps.</div>`;
+    return;
+  }
+  const totArea = deals.reduce((s, o) => s + (o.parcels || []).reduce((a, p) => a + (+p.area_m2 || 0), 0), 0);
+  const totSpent = deals.reduce((s, o) => s + (+o.spent || 0), 0);
+  el.innerHTML = `<div class="tblwrap"><table><thead><tr>
+    <th>Deal</th><th>Stage</th><th>Parcels & area</th><th>Model</th>
+    <th class="num">Spent €</th><th>Next step</th><th></th>
+  </tr></thead><tbody>` + deals.map(o => `<tr>
+    <td><b>${esc(o.name)}</b></td>
+    <td>${o.stage}. ${STAGE_NAMES[o.stage] || ""}</td>
+    <td>${parcelChips(o)}</td>
+    <td>${esc(o.model || "undecided")}</td>
+    <td class="num">${fmtN(o.spent)}</td>
+    <td>${o.open_tasks ? `${o.open_tasks} task(s)${o.next_due ? " · " + esc(o.next_due) : ""}` : `<span class="muted">set the next task</span>`}</td>
+    <td>${o.lat ? `<span class="loc" onclick="djLocate(${o.lat}, ${o.lon})" title="Show on the map">📍</span>` : ""}</td>
+  </tr>`).join("") + `</tbody><tfoot><tr>
+    <th>Total: ${deals.length} deal(s)</th><th></th><th class="num">${fmtN(totArea)} m²</th><th></th>
+    <th class="num">${fmtN(totSpent)}</th><th></th><th></th>
+  </tr></tfoot></table></div>`;
+}
+
+/* ---------- address search (Nominatim) ---------- */
 const sIn = document.getElementById("searchIn");
 const sRes = document.getElementById("searchRes");
 let sTimer = null;
@@ -262,6 +474,7 @@ async function doSearch() {
   }
 }
 async function pickResult(it) {
+  setView("map");
   const lat = parseFloat(it.lat), lon = parseFloat(it.lon);
   const label = it.display_name.split(",").slice(0, 3).join(",").trim();
   map.flyTo({ center: [lon, lat], zoom: 17.2 });
@@ -272,7 +485,7 @@ async function pickResult(it) {
     const d = await api(`what=parcel_at&lat=${lat}&lon=${lon}`, KEY);
     const m = (d.matches || [])[0];
     if (m) {
-      inner += `<br>On parcel <b>${esc(m.parcel_no)}</b> (${esc(m.ko || "")}, ${m.area_m2 ? Math.round(m.area_m2).toLocaleString() + " m²" : "?"})`;
+      inner += `<br>On parcel <b>${esc(m.parcel_no)}</b> (${esc(m.ko || "")}, ${m.area_m2 ? fmtN(m.area_m2) + " m²" : "?"})`;
       inner += m.prospect ? `<br>Already tracked: <b>${esc(m.prospect)}</b> (stage ${m.stage})` : "";
     } else {
       inner += `<br><span class="muted">Parcel not loaded here yet — it can still be saved as a pin.</span>`;
