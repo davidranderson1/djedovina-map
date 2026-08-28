@@ -28,6 +28,7 @@ button.on{background:var(--olive);color:var(--bg);border-color:var(--olive)}
 #searchRes div{padding:8px 10px;border-top:1px solid var(--line);cursor:pointer;font-size:13px}
 #searchRes div:first-child{border-top:none}
 #searchRes div:hover{background:var(--bg)}
+/* filter bar */
 #filters{display:none;gap:8px;align-items:center;padding:8px 14px;background:var(--panel2);border-bottom:1px solid var(--line);flex-wrap:wrap;font-size:13px}
 #filters.open{display:flex}
 #filters select,#filters input{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:6px 8px}
@@ -49,6 +50,7 @@ aside h2{font-size:15px;margin-bottom:8px}
 #legend{position:absolute;bottom:26px;left:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;z-index:5}
 #legend div{display:flex;align-items:center;gap:8px;margin:3px 0}
 #legend i{width:14px;height:14px;border-radius:3px;display:inline-block}
+/* overlay views */
 .oview{position:absolute;inset:0;background:var(--bg);z-index:8;overflow:auto;padding:16px;display:none}
 .oview.open{display:block}
 .oview h2{font-size:17px;margin-bottom:4px}
@@ -98,6 +100,7 @@ tr:hover td{background:var(--panel2)}
   <div class="brand">Djedovina <span>· Karta</span></div>
   <nav class="vtabs" id="vtabs">
     <button data-v="map" class="on">Map</button>
+    <button data-v="research">Research</button>
     <button data-v="ops">Operations</button>
     <button data-v="sales">Sales</button>
   </nav>
@@ -131,6 +134,15 @@ tr:hover td{background:var(--panel2)}
       <option value="14-15">Close & exit 14–15</option>
     </select></label>
   <label>Area m² <input id="fMin" type="number" placeholder="min"> – <input id="fMax" type="number" placeholder="max"></label>
+  <label>Zoning
+    <select id="fZon">
+      <option value="">Any</option>
+      <option value="unset">Not set yet</option>
+      <option value="building">Building (građevinsko)</option>
+      <option value="agricultural">Agricultural (poljoprivredno)</option>
+      <option value="forest">Forest (šuma)</option>
+      <option value="mixed">Mixed</option>
+    </select></label>
   <label>Owners recorded
     <select id="fOwn">
       <option value="">Any</option>
@@ -155,6 +167,16 @@ tr:hover td{background:var(--panel2)}
     <div id="alist"></div>
   </aside>
 
+  <div class="oview" id="researchView">
+    <h2>Research — the extract-reading queue</h2>
+    <p class="sub">Unread parcels, workable sizes first (skip the mountain commons at the bottom). Open the land registry portal, read sheet B, type what you see — owners one per line as <b>Name | share | flags</b> (flags: no-oib, deceased, abroad), e.g. <i>Ivan K. | 1/12 | deceased</i>. Saving records the folio, links it to the parcel, and feeds the map's colors, filters and scoring.</p>
+    <div class="bar" style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <label class="muted">Cadastral municipality <select id="rKo" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:6px 8px"><option value="">All</option></select></label>
+      <button id="rReload">Reload queue</button>
+    </div>
+    <div id="researchBody"></div>
+  </div>
+
   <div class="oview" id="opsView">
     <h2>Operations — the working pipeline</h2>
     <p class="sub">Every prospect, whatever its stage. Change a stage right here; it is journalled automatically. 📍 jumps to it on the map.</p>
@@ -177,6 +199,7 @@ tr:hover td{background:var(--panel2)}
   <div><i style="background:#8FBF7F"></i> Deal (9–13)</div>
   <div><i style="background:#E9E0C9"></i> Close & exit (14–15)</div>
   <div><i style="background:transparent;border:2px solid var(--terra);border-radius:50%"></i> Saved pin (parcel not loaded yet)</div>
+  <div><i style="background:transparent;border:2px solid var(--sea);border-radius:50%"></i> Court notice on this parcel</div>
 </div>
 
 <script>
@@ -236,9 +259,11 @@ function setView(v) {
   vtabs.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   document.getElementById("opsView").classList.toggle("open", v === "ops");
   document.getElementById("salesView").classList.toggle("open", v === "sales");
+  document.getElementById("researchView").classList.toggle("open", v === "research");
   document.getElementById("legend").style.display = v === "map" ? "block" : "none";
   if (v === "ops") renderOps();
   if (v === "sales") renderSales();
+  if (v === "research") loadWorklist();
 }
 window.djLocate = function (lat, lon) {
   setView("map");
@@ -266,8 +291,8 @@ async function boot() {
 }
 async function loadData() {
   try {
-    const [status, parcels, notices, pins, ops] = await Promise.all([
-      api("what=status", KEY), api("what=parcels", KEY), api("what=notices", KEY), api("what=pins", KEY), api("what=ops", KEY)
+    const [status, parcels, notices, pins, ops, npins] = await Promise.all([
+      api("what=status", KEY), api("what=parcels", KEY), api("what=notices", KEY), api("what=pins", KEY), api("what=ops", KEY), api("what=notice_pins", KEY)
     ]);
     opsData = ops || [];
     if (status.notify) notifyPref = status.notify;
@@ -280,9 +305,14 @@ async function loadData() {
       type: "Feature", geometry: { type: "Point", coordinates: [p.lon, p.lat] },
       properties: { name: p.name, stage: p.stage, address: p.address || "" }
     })) };
+    const noticeGeo = { type: "FeatureCollection", features: (npins || []).map(n => ({
+      type: "Feature", geometry: { type: "Point", coordinates: [n.lon, n.lat] },
+      properties: { case_no: n.case_no || "", kind: n.kind || "", title: n.title || "", expires_at: n.expires_at || "", parcel_no: n.parcel_no || "" }
+    })) };
     if (map.getSource("parcels")) {
       applyFilters();
       map.getSource("pins").setData(pinGeo);
+      map.getSource("npins").setData(noticeGeo);
     } else {
       map.addSource("parcels", { type: "geojson", data: allParcels });
       map.addLayer({ id: "parcel-fill", type: "fill", source: "parcels",
@@ -298,8 +328,19 @@ async function loadData() {
           `<b>${esc(p.name)}</b><br><span class="muted">Saved pin · stage ${esc(p.stage)}</span>` +
           (p.address ? `<br>${esc(p.address)}` : "")).addTo(map);
       });
+      map.addSource("npins", { type: "geojson", data: noticeGeo });
+      map.addLayer({ id: "notice-dots", type: "circle", source: "npins",
+        paint: { "circle-radius": 8, "circle-color": "#7FB4C4", "circle-stroke-color": "#141F26", "circle-stroke-width": 2 } });
+      map.on("click", "notice-dots", e => {
+        const p = e.features[0].properties;
+        const dl = daysLeft(p.expires_at);
+        new maplibregl.Popup().setLngLat(e.lngLat).setHTML(
+          `<b>⚖ ${esc(p.case_no)}</b> — ${p.kind === "probate" ? "heirs sought" : "title correction"}<br>${esc(p.title)}` +
+          `<br><span class="muted">parcel ${esc(p.parcel_no)}</span>` +
+          (dl != null ? `<br><b style="color:${dl <= 10 ? "var(--crit)" : "var(--warn)"}">${dl} days left to respond</b>` : "")).addTo(map);
+      });
       map.on("click", "parcel-fill", e => openParcelPopup(e.features[0].properties, e.lngLat));
-      for (const l of ["parcel-fill", "pin-dots"]) {
+      for (const l of ["parcel-fill", "pin-dots", "notice-dots"]) {
         map.on("mouseenter", l, () => map.getCanvas().style.cursor = "pointer");
         map.on("mouseleave", l, () => map.getCanvas().style.cursor = "");
       }
@@ -319,10 +360,10 @@ document.getElementById("filtersBtn").onclick = function () {
   document.getElementById("filters").classList.toggle("open");
   this.classList.toggle("on");
 };
-for (const id of ["fKo", "fStage", "fOwn"]) document.getElementById(id).addEventListener("change", applyFilters);
+for (const id of ["fKo", "fStage", "fOwn", "fZon"]) document.getElementById(id).addEventListener("change", applyFilters);
 for (const id of ["fMin", "fMax"]) document.getElementById(id).addEventListener("input", () => { clearTimeout(window.__ft); window.__ft = setTimeout(applyFilters, 400); });
 document.getElementById("fClear").onclick = () => {
-  for (const id of ["fKo", "fStage", "fOwn"]) document.getElementById(id).value = "";
+  for (const id of ["fKo", "fStage", "fOwn", "fZon"]) document.getElementById(id).value = "";
   document.getElementById("fMin").value = ""; document.getElementById("fMax").value = "";
   applyFilters();
 };
@@ -348,6 +389,9 @@ function applyFilters() {
       const [a, b] = st.split("-").map(Number);
       if (p.stage == null || p.stage < a || p.stage > b) return false;
     }
+    const zn = document.getElementById("fZon").value;
+    if (zn === "unset" && p.zoning) return false;
+    if (zn && zn !== "unset" && !(p.zoning || "").toLowerCase().startsWith(zn === "building" ? "building" : zn)) return false;
     if (isFinite(min) && !(p.area_m2 >= min)) return false;
     if (isFinite(max) && !(p.area_m2 <= max)) return false;
     if (own !== "") {
@@ -363,19 +407,29 @@ function applyFilters() {
 }
 
 /* ---------- notices ---------- */
+function daysLeft(d) {
+  if (!d) return null;
+  return Math.ceil((new Date(d + "T23:59:59") - Date.now()) / 864e5);
+}
 function renderNotices(notices) {
   const nl = document.getElementById("nlist");
   document.getElementById("ncount").textContent = `(${notices.length} live)`;
-  nl.innerHTML = notices.map(n =>
+  nl.innerHTML = notices.map(n => {
+    const dl = daysLeft(n.expires_at);
+    const urgency = dl != null && dl <= 10 ? ` <span style="color:var(--crit);font-weight:700">${dl} days left</span>` : dl != null ? ` <span class="muted">${dl} days left</span>` : "";
+    n.__urg = urgency;
+    return n;
+  }).map(n =>
     `<div class="notice"><span class="k ${esc(n.kind)}">${n.kind === "probate" ? "heirs sought" : n.kind === "correction-procedure" ? "title correction" : esc(n.kind)}</span>` +
     ` <span class="muted">${esc(n.published_at || "")}</span><br>` +
     `<b>${esc(n.case_no || "")}</b> ${esc(n.title || "")}<br>` +
-    `<span class="muted">${esc(n.court || "")} · expires ${esc(n.expires_at || "")}</span>` +
+    `<span class="muted">${esc(n.court || "")}${n.ko_hint ? " · k.o. " + esc(n.ko_hint) : ""}</span>${n.__urg || ""}` +
+    `${n.matched_parcel ? ` · <b style="color:var(--sea)">on our map</b>` : ""}` +
     `${n.source_url && !n.source_url.includes("#") ? ` · <a href="${esc(n.source_url)}" target="_blank" rel="noopener">record</a>` : ""}</div>`
   ).join("") || `<p class="muted">No live notices.</p>`;
 }
 
-/* ---------- parcel popup / add / stage ---------- */
+/* ---------- parcel popup / add ---------- */
 function openParcelPopup(p, lngLat) {
   const g = `https://www.google.com/maps?q=${p.lat},${p.lon}`;
   const sv = `https://www.google.com/maps?layer=c&cbll=${p.lat},${p.lon}`;
@@ -384,7 +438,7 @@ function openParcelPopup(p, lngLat) {
     `<b>Parcel ${esc(p.parcel_no)}</b> — ${esc(p.ko || "")}<br>` +
     `${p.area_m2 ? fmtN(p.area_m2) + " m²" : ""}` +
     `${hasProspect ? "<br>Prospect: <b>" + esc(p.prospect) + "</b> (stage " + p.stage + ")" : "<br><span style='color:#A99F87'>Not researched yet</span>"}` +
-    `<br>Owners recorded: ${p.owners_known ?? 0}` +
+    `<br>Owners recorded: ${p.owners_known ?? 0}${p.zoning ? " · zoning: " + esc(p.zoning) : ""}${p.read ? " · <span style='color:var(--good)'>extract read ✓</span>" : ""}` +
     `<br><a href="${g}" target="_blank" rel="noopener">Google Maps</a> · <a href="${sv}" target="_blank" rel="noopener">Street View</a> · <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Land registry</a>` +
     (!hasProspect ? `<br><button class="add" onclick="djAdd('Parcel ${esc(p.parcel_no)}, ${esc(p.ko || "")}', ${p.lat}, ${p.lon}, this)">+ Add to Djedovina</button>` : "")
   ).addTo(map);
@@ -462,6 +516,68 @@ function renderSales() {
     <th class="num">${fmtN(totSpent)}</th><th></th><th></th>
   </tr></tfoot></table></div>`;
 }
+
+/* ---------- research (extract-reading queue) ---------- */
+document.getElementById("rReload").onclick = loadWorklist;
+document.getElementById("rKo").addEventListener("change", loadWorklist);
+async function loadWorklist() {
+  const el = document.getElementById("researchBody");
+  el.innerHTML = `<p class="muted">Loading the queue…</p>`;
+  const rSel = document.getElementById("rKo");
+  const cur = rSel.value;
+  const kos = [...new Set(allParcels.features.map(f => f.properties.ko).filter(Boolean))].sort();
+  rSel.innerHTML = `<option value="">All</option>` + kos.map(k => `<option ${k === cur ? "selected" : ""}>${esc(k)}</option>`).join("");
+  rSel.value = cur;
+  try {
+    const items = await api(`what=worklist&limit=25${cur ? "&ko=" + encodeURIComponent(cur) : ""}`, KEY);
+    if (!items.length) { el.innerHTML = `<div class="empty">Queue is empty for this selection — every loaded parcel here has been read.</div>`; return; }
+    el.innerHTML = items.map(w => `<div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px" id="wl-${w.parcel_id}">
+      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+        <b>Parcel ${esc(w.parcel_no)}</b><span class="muted">${esc(w.ko || "")} · ${fmtN(w.area_m2)} m²${w.prospect ? " · prospect: " + esc(w.prospect) : ""}</span>
+        <span class="spacer" style="flex:1"></span>
+        <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Open land registry</a>
+        <a href="https://ispu.mgipu.hr/" target="_blank" rel="noopener">Planning (ISPU)</a>
+        <span class="loc" onclick="djLocate(${w.lat}, ${w.lon})">📍</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
+        <input placeholder="folio no. (zk. ul.)" id="wu-${w.parcel_id}" style="width:130px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:6px 8px">
+        <label class="muted" style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="wp-${w.parcel_id}"> plomba</label>
+        <select id="wz-${w.parcel_id}" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:6px 8px">
+          <option value="">zoning…</option><option value="building">building</option><option value="agricultural">agricultural</option><option value="forest">forest</option><option value="mixed">mixed</option>
+        </select>
+        <input placeholder="encumbrances (sheet C), one line" id="we-${w.parcel_id}" style="flex:1;min-width:180px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:6px 8px">
+      </div>
+      <textarea placeholder="owners, one per line: Name | share | flags (no-oib, deceased, abroad)" id="wo-${w.parcel_id}" rows="3" style="width:100%;margin-top:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:8px;font:12.5px/1.5 ui-monospace,monospace"></textarea>
+      <div style="margin-top:8px"><button class="add" style="background:var(--olive);color:var(--bg);border:none;font-weight:700;padding:7px 14px;border-radius:6px;cursor:pointer" onclick="djSaveExtract(${w.parcel_id}, this)">Save extract</button></div>
+    </div>`).join("");
+  } catch (e) {
+    el.innerHTML = `<div class="empty">Could not load the queue: ${esc(e.message)}</div>`;
+  }
+}
+window.djSaveExtract = async function (pid, btn) {
+  const g = id => document.getElementById(id + "-" + pid);
+  const owners = g("wo").value.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
+    const parts = l.split("|").map(x => x.trim());
+    const flags = (parts[2] || "").toLowerCase();
+    return { name: parts[0], share: parts[1] || null,
+             no_oib: flags.includes("no-oib") || flags.includes("no oib"),
+             deceased: flags.includes("deceas"), abroad: flags.includes("abroad") };
+  });
+  btn.disabled = true; btn.textContent = "Saving…";
+  try {
+    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=save_extract`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ parcel_id: pid, unit_no: g("wu").value, plomba: g("wp").checked,
+        encumbrances: g("we").value, zoning: g("wz").value || null, owners })
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    const card = document.getElementById("wl-" + pid);
+    card.innerHTML = `<b style="color:var(--good)">Saved ✓</b> <span class="muted">folio recorded, ${d.owners_saved} owner line(s)</span>`;
+    setTimeout(() => card.remove(), 1500);
+    loadData();
+  } catch (e) { btn.disabled = false; btn.textContent = "Failed — try again (" + e.message + ")"; }
+};
 
 /* ---------- address search (Nominatim) ---------- */
 const sIn = document.getElementById("searchIn");
