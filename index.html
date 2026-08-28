@@ -11,13 +11,20 @@
 :root{--bg:#141F26;--panel:#1C2A33;--ink:#E9E0C9;--ink2:#A99F87;--line:#31434E;--olive:#93A467;--terra:#D6845A;--sea:#7FB4C4}
 *{box-sizing:border-box;margin:0}
 body{font:14px/1.45 system-ui,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column}
-header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
-.brand{font-family:Georgia,serif;font-weight:700;font-size:20px}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.brand{font-family:Georgia,serif;font-weight:700;font-size:20px;white-space:nowrap}
 .brand span{color:var(--olive)}
 #stats{color:var(--ink2);font-size:13px}
 .spacer{flex:1}
 button,.btn{background:transparent;border:1px solid var(--line);color:var(--ink2);padding:6px 10px;border-radius:6px;cursor:pointer;font:inherit}
 button.on{background:var(--olive);color:var(--bg);border-color:var(--olive)}
+#searchWrap{position:relative;flex:1;min-width:220px;max-width:420px}
+#searchIn{width:100%;padding:7px 34px 7px 10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);font:inherit}
+#searchGo{position:absolute;right:2px;top:2px;bottom:2px;border:none;background:transparent;color:var(--olive);cursor:pointer;padding:0 9px;font-size:15px}
+#searchRes{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;z-index:40;max-height:280px;overflow:auto;display:none;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+#searchRes div{padding:8px 10px;border-top:1px solid var(--line);cursor:pointer;font-size:13px}
+#searchRes div:first-child{border-top:none}
+#searchRes div:hover{background:var(--bg)}
 main{flex:1;display:flex;min-height:0}
 #map{flex:1}
 aside{width:330px;background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:12px;display:none}
@@ -38,8 +45,9 @@ aside h2{font-size:15px;margin-bottom:8px}
 #gate input{width:100%;margin:14px 0;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);font:inherit}
 #gate .go{background:var(--olive);color:var(--bg);border:none;font-weight:700;padding:10px 18px;border-radius:6px;cursor:pointer}
 #gate .err{color:#E08A6D;font-size:13px;margin-top:10px;min-height:18px}
-.maplibregl-popup-content{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;font:13px/1.5 system-ui,sans-serif;padding:12px 14px}
+.maplibregl-popup-content{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;font:13px/1.5 system-ui,sans-serif;padding:12px 14px;max-width:300px}
 .maplibregl-popup-content a{color:var(--sea)}
+.maplibregl-popup-content .add{margin-top:8px;background:var(--olive);color:var(--bg);border:none;font-weight:700;padding:6px 12px;border-radius:6px;cursor:pointer;font:inherit}
 .maplibregl-popup-close-button{color:var(--ink2);font-size:18px}
 .maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:var(--panel)}
 </style>
@@ -55,6 +63,11 @@ aside h2{font-size:15px;margin-bottom:8px}
 
 <header>
   <div class="brand">Djedovina <span>· Karta</span></div>
+  <div id="searchWrap">
+    <input id="searchIn" placeholder="Search an address or place (e.g. Put Polja, Klis)…" autocomplete="off">
+    <button id="searchGo" title="Search">⌕</button>
+    <div id="searchRes"></div>
+  </div>
   <span id="stats">loading…</span>
   <div class="spacer"></div>
   <button id="noticesBtn">Court notices</button>
@@ -73,6 +86,7 @@ aside h2{font-size:15px;margin-bottom:8px}
   <div><i style="background:#D6845A"></i> Title works (8)</div>
   <div><i style="background:#8FBF7F"></i> Deal (9–13)</div>
   <div><i style="background:#E9E0C9"></i> Close & exit (14–15)</div>
+  <div><i style="background:transparent;border:2px solid var(--terra);border-radius:50%"></i> Saved pin (parcel not loaded yet)</div>
 </div>
 
 <script>
@@ -85,8 +99,8 @@ const keyErr = document.getElementById("keyErr");
 document.getElementById("keyGo").onclick = tryKey;
 document.getElementById("keyIn").addEventListener("keydown", e => { if (e.key === "Enter") tryKey(); });
 
-async function api(what, key) {
-  const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}&what=${what}`);
+async function api(qs, key) {
+  const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}&${qs}`);
   if (r.status === 401) throw new Error("unauthorized");
   if (!r.ok) throw new Error("server " + r.status);
   return r.json();
@@ -96,7 +110,7 @@ async function tryKey() {
   if (!k) return;
   keyErr.textContent = "checking…";
   try {
-    await api("status", k);
+    await api("what=status", k);
     KEY = k; try { localStorage.setItem(LS, k); } catch (e) {}
     keyErr.textContent = "";
     boot();
@@ -106,7 +120,7 @@ async function tryKey() {
 }
 document.getElementById("lockBtn").onclick = () => { try { localStorage.removeItem(LS); } catch (e) {} location.reload(); };
 
-let map, booted = false;
+let map, booted = false, searchMarker = null;
 function stageColor(s) {
   if (s == null) return "#5c6a75";
   if (s <= 4) return "#7FB4C4";
@@ -116,6 +130,8 @@ function stageColor(s) {
   if (s <= 13) return "#8FBF7F";
   return "#E9E0C9";
 }
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
 async function boot() {
   gate.style.display = "none";
   if (booted) { return loadData(); }
@@ -124,7 +140,7 @@ async function boot() {
     container: "map",
     style: {
       version: 8,
-      sources: { osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors" } },
+      sources: { osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors · Geocoding © Nominatim" } },
       layers: [{ id: "osm", type: "raster", source: "osm" }]
     },
     center: [16.524, 43.557], zoom: 13.5
@@ -132,54 +148,150 @@ async function boot() {
   map.addControl(new maplibregl.NavigationControl());
   map.on("load", loadData);
 }
+
+/* ---------- data ---------- */
 async function loadData() {
   try {
-    const [status, parcels, notices] = await Promise.all([api("status", KEY), api("parcels", KEY), api("notices", KEY)]);
+    const [status, parcels, notices, pins] = await Promise.all([
+      api("what=status", KEY), api("what=parcels", KEY), api("what=notices", KEY), api("what=pins", KEY)
+    ]);
     document.getElementById("stats").textContent =
       `${status.parcels ?? 0} parcels · tiles ${status.tiles_done ?? 0}/${status.tiles_total ?? 0} loaded · ${status.notices ?? 0} notices`;
     for (const f of parcels.features) f.properties.color = stageColor(f.properties.stage);
+    const pinGeo = { type: "FeatureCollection", features: (pins || []).map(p => ({
+      type: "Feature", geometry: { type: "Point", coordinates: [p.lon, p.lat] },
+      properties: { name: p.name, stage: p.stage, address: p.address || "" }
+    })) };
     if (map.getSource("parcels")) {
       map.getSource("parcels").setData(parcels);
+      map.getSource("pins").setData(pinGeo);
     } else {
       map.addSource("parcels", { type: "geojson", data: parcels });
       map.addLayer({ id: "parcel-fill", type: "fill", source: "parcels",
         paint: { "fill-color": ["get", "color"], "fill-opacity": 0.42 } });
       map.addLayer({ id: "parcel-line", type: "line", source: "parcels",
         paint: { "line-color": ["get", "color"], "line-width": 1.2 } });
+      map.addSource("pins", { type: "geojson", data: pinGeo });
+      map.addLayer({ id: "pin-dots", type: "circle", source: "pins",
+        paint: { "circle-radius": 7, "circle-color": "#D6845A", "circle-stroke-color": "#141F26", "circle-stroke-width": 2 } });
+      map.on("click", "pin-dots", e => {
+        const p = e.features[0].properties;
+        new maplibregl.Popup().setLngLat(e.lngLat).setHTML(
+          `<b>${esc(p.name)}</b><br><span class="muted">Saved pin · stage ${esc(p.stage)}</span>` +
+          (p.address ? `<br>${esc(p.address)}` : "")).addTo(map);
+      });
       map.on("click", "parcel-fill", e => {
         const p = e.features[0].properties;
-        const g = `https://www.google.com/maps?q=${p.lat},${p.lon}`;
-        const sv = `https://www.google.com/maps?layer=c&cbll=${p.lat},${p.lon}`;
-        new maplibregl.Popup({ maxWidth: "300px" }).setLngLat(e.lngLat).setHTML(
-          `<b>Parcel ${esc(p.parcel_no)}</b> — ${esc(p.ko || "")}<br>` +
-          `${p.area_m2 ? Math.round(p.area_m2).toLocaleString() + " m²" : ""}` +
-          `${p.prospect && p.prospect !== "null" ? "<br>Prospect: <b>" + esc(p.prospect) + "</b> (stage " + p.stage + ")" : "<br><span style='color:#A99F87'>Not researched yet</span>"}` +
-          `<br>Owners recorded: ${p.owners_known ?? 0}` +
-          `<br><a href="${g}" target="_blank" rel="noopener">Google Maps</a> · <a href="${sv}" target="_blank" rel="noopener">Street View</a> · <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Land registry</a>`
-        ).addTo(map);
+        openParcelPopup(p, e.lngLat);
       });
-      map.on("mouseenter", "parcel-fill", () => map.getCanvas().style.cursor = "pointer");
-      map.on("mouseleave", "parcel-fill", () => map.getCanvas().style.cursor = "");
+      for (const l of ["parcel-fill", "pin-dots"]) {
+        map.on("mouseenter", l, () => map.getCanvas().style.cursor = "pointer");
+        map.on("mouseleave", l, () => map.getCanvas().style.cursor = "");
+      }
     }
-    const nl = document.getElementById("nlist");
-    document.getElementById("ncount").textContent = `(${notices.length} live)`;
-    nl.innerHTML = notices.map(n =>
-      `<div class="notice"><span class="k ${esc(n.kind)}">${n.kind === "probate" ? "heirs sought" : n.kind === "correction-procedure" ? "title correction" : esc(n.kind)}</span>` +
-      ` <span class="muted">${esc(n.published_at || "")}</span><br>` +
-      `<b>${esc(n.case_no || "")}</b> ${esc(n.title || "")}<br>` +
-      `<span class="muted">${esc(n.court || "")} · expires ${esc(n.expires_at || "")}</span>` +
-      `${n.source_url && !n.source_url.includes("#") ? ` · <a href="${esc(n.source_url)}" target="_blank" rel="noopener">record</a>` : ""}</div>`
-    ).join("") || `<p class="muted">No live notices.</p>`;
+    renderNotices(notices);
   } catch (e) {
     document.getElementById("stats").textContent = "load failed: " + e.message;
   }
 }
-function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function renderNotices(notices) {
+  const nl = document.getElementById("nlist");
+  document.getElementById("ncount").textContent = `(${notices.length} live)`;
+  nl.innerHTML = notices.map(n =>
+    `<div class="notice"><span class="k ${esc(n.kind)}">${n.kind === "probate" ? "heirs sought" : n.kind === "correction-procedure" ? "title correction" : esc(n.kind)}</span>` +
+    ` <span class="muted">${esc(n.published_at || "")}</span><br>` +
+    `<b>${esc(n.case_no || "")}</b> ${esc(n.title || "")}<br>` +
+    `<span class="muted">${esc(n.court || "")} · expires ${esc(n.expires_at || "")}</span>` +
+    `${n.source_url && !n.source_url.includes("#") ? ` · <a href="${esc(n.source_url)}" target="_blank" rel="noopener">record</a>` : ""}</div>`
+  ).join("") || `<p class="muted">No live notices.</p>`;
+}
+function openParcelPopup(p, lngLat) {
+  const g = `https://www.google.com/maps?q=${p.lat},${p.lon}`;
+  const sv = `https://www.google.com/maps?layer=c&cbll=${p.lat},${p.lon}`;
+  const hasProspect = p.prospect && p.prospect !== "null";
+  new maplibregl.Popup({ maxWidth: "300px" }).setLngLat(lngLat).setHTML(
+    `<b>Parcel ${esc(p.parcel_no)}</b> — ${esc(p.ko || "")}<br>` +
+    `${p.area_m2 ? Math.round(p.area_m2).toLocaleString() + " m²" : ""}` +
+    `${hasProspect ? "<br>Prospect: <b>" + esc(p.prospect) + "</b> (stage " + p.stage + ")" : "<br><span style='color:#A99F87'>Not researched yet</span>"}` +
+    `<br>Owners recorded: ${p.owners_known ?? 0}` +
+    `<br><a href="${g}" target="_blank" rel="noopener">Google Maps</a> · <a href="${sv}" target="_blank" rel="noopener">Street View</a> · <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Land registry</a>` +
+    (!hasProspect ? `<br><button class="add" onclick="djAdd('Parcel ${esc(p.parcel_no)}, ${esc(p.ko || "")}', ${p.lat}, ${p.lon}, this)">+ Add to Djedovina</button>` : "")
+  ).addTo(map);
+}
+
+/* ---------- add prospect ---------- */
+window.djAdd = async function (label, lat, lon, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+  try {
+    const r = await api(`what=add_prospect&label=${encodeURIComponent(label)}&lat=${lat}&lon=${lon}`, KEY);
+    if (btn) btn.textContent = r.linked_parcel ? `Saved — linked to parcel ${r.linked_parcel} ✓` : "Saved as pin ✓";
+    loadData();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Failed — try again (" + e.message + ")"; }
+  }
+};
+
+/* ---------- address search (OpenStreetMap Nominatim, biased to the Split area) ---------- */
+const sIn = document.getElementById("searchIn");
+const sRes = document.getElementById("searchRes");
+let sTimer = null;
+sIn.addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); if (e.key === "Escape") hideRes(); });
+sIn.addEventListener("input", () => { clearTimeout(sTimer); if (sIn.value.trim().length > 3) sTimer = setTimeout(doSearch, 700); });
+document.getElementById("searchGo").onclick = doSearch;
+document.addEventListener("click", e => { if (!e.target.closest("#searchWrap")) hideRes(); });
+function hideRes() { sRes.style.display = "none"; }
+async function doSearch() {
+  const q = sIn.value.trim();
+  if (!q) return;
+  sRes.style.display = "block";
+  sRes.innerHTML = `<div class="muted">Searching…</div>`;
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=hr&viewbox=16.10,43.72,16.90,43.38&q=${encodeURIComponent(q)}`,
+      { headers: { "Accept-Language": "hr,en" } });
+    const items = await r.json();
+    if (!items.length) { sRes.innerHTML = `<div class="muted">Nothing found — try adding the town, e.g. "…, Klis".</div>`; return; }
+    sRes.innerHTML = "";
+    items.forEach(it => {
+      const d = document.createElement("div");
+      d.textContent = it.display_name;
+      d.onclick = () => { hideRes(); pickResult(it); };
+      sRes.appendChild(d);
+    });
+  } catch (e) {
+    sRes.innerHTML = `<div class="muted">Search failed: ${esc(e.message)}</div>`;
+  }
+}
+async function pickResult(it) {
+  const lat = parseFloat(it.lat), lon = parseFloat(it.lon);
+  const label = it.display_name.split(",").slice(0, 3).join(",").trim();
+  map.flyTo({ center: [lon, lat], zoom: 17.2 });
+  if (searchMarker) searchMarker.remove();
+  searchMarker = new maplibregl.Marker({ color: "#D6845A" }).setLngLat([lon, lat]).addTo(map);
+  let inner = `<b>${esc(label)}</b><br><span class="muted">${lat.toFixed(5)}, ${lon.toFixed(5)}</span>`;
+  try {
+    const d = await api(`what=parcel_at&lat=${lat}&lon=${lon}`, KEY);
+    const m = (d.matches || [])[0];
+    if (m) {
+      inner += `<br>On parcel <b>${esc(m.parcel_no)}</b> (${esc(m.ko || "")}, ${m.area_m2 ? Math.round(m.area_m2).toLocaleString() + " m²" : "?"})`;
+      inner += m.prospect ? `<br>Already tracked: <b>${esc(m.prospect)}</b> (stage ${m.stage})` : "";
+    } else {
+      inner += `<br><span class="muted">Parcel not loaded here yet — it can still be saved as a pin.</span>`;
+    }
+    inner += `<br><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener">Google Maps</a> · <a href="https://www.google.com/maps?layer=c&cbll=${lat},${lon}" target="_blank" rel="noopener">Street View</a> · <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Land registry</a>`;
+    if (!m || !m.prospect) {
+      inner += `<br><button class="add" onclick="djAdd('${esc(label).replace(/'/g, "\\'")}', ${lat}, ${lon}, this)">+ Add to Djedovina</button>`;
+    }
+  } catch (e) {
+    inner += `<br><span class="muted">Lookup failed: ${esc(e.message)}</span>`;
+  }
+  new maplibregl.Popup({ maxWidth: "300px" }).setLngLat([lon, lat]).setHTML(inner).addTo(map);
+}
+
 document.getElementById("noticesBtn").onclick = function () {
   const s = document.getElementById("side"); s.classList.toggle("open"); this.classList.toggle("on");
 };
 document.getElementById("refreshBtn").onclick = loadData;
-if (KEY) { api("status", KEY).then(boot).catch(() => { gate.style.display = "flex"; }); } else { gate.style.display = "flex"; }
+if (KEY) { api("what=status", KEY).then(boot).catch(() => { gate.style.display = "flex"; }); } else { gate.style.display = "flex"; }
 </script>
 </body>
 </html>
