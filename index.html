@@ -114,6 +114,8 @@ tr:hover td{background:var(--panel2)}
   <span id="stats">loading…</span>
   <div class="spacer"></div>
   <button id="baseBtn" title="Switch base map">Satellite</button>
+  <button id="lblBtn" class="on" title="Show or hide parcel numbers (visible when zoomed in)">#</button>
+  <button id="areaBtn" title="Draw a rectangle — every parcel inside is added to the list as one selection">▭ Area</button>
   <button id="bellBtn" title="Notifications">🔔<span id="bellN"></span></button>
   <button id="settingsBtn" title="Settings">⚙</button>
   <button id="filtersBtn">Filters</button>
@@ -260,7 +262,7 @@ tr:hover td{background:var(--panel2)}
 </div>
 
 <script>
-const ENDPOINT = "https://yunbpixnjktzaxbmdwad.supabase.co/functions/v1/map-data";
+const ENDPOINT = "https://zoojmmcdnyciadzktqnx.supabase.co/functions/v1/map-data";
 const LS = "djedovina-map-key";
 let KEY = null; try { KEY = localStorage.getItem(LS); } catch (e) {}
 
@@ -358,6 +360,79 @@ window.djLocate = function (lat, lon) {
   searchMarker = new maplibregl.Marker({ color: "#D6845A" }).setLngLat([lon, lat]).addTo(map);
 };
 
+/* ---------- parcel-number labels toggle ---------- */
+document.getElementById("lblBtn").onclick = function () {
+  if (!map || !map.getLayer("parcel-labels")) return;
+  const on = map.getLayoutProperty("parcel-labels", "visibility") !== "none";
+  map.setLayoutProperty("parcel-labels", "visibility", on ? "none" : "visible");
+  this.classList.toggle("on", !on);
+};
+
+/* ---------- rectangle area selection ---------- */
+let drawMode = false, drawA = null;
+const areaBtn = document.getElementById("areaBtn");
+function boxGeo(a, b) {
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [[
+    [a.lng, a.lat], [b.lng, a.lat], [b.lng, b.lat], [a.lng, b.lat], [a.lng, a.lat]
+  ]] }, properties: {} };
+}
+function drawCleanup() {
+  drawMode = false; drawA = null;
+  areaBtn.classList.remove("on");
+  if (map) {
+    map.dragPan.enable();
+    map.getCanvas().style.cursor = "";
+    if (map.getSource("drawbox")) map.getSource("drawbox").setData({ type: "FeatureCollection", features: [] });
+  }
+}
+areaBtn.onclick = function () {
+  if (!map) return;
+  setView("map");
+  if (drawMode) { drawCleanup(); return; }
+  drawMode = true;
+  this.classList.add("on");
+  map.dragPan.disable();
+  map.getCanvas().style.cursor = "crosshair";
+  if (!map.getSource("drawbox")) {
+    map.addSource("drawbox", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "drawbox-fill", type: "fill", source: "drawbox", paint: { "fill-color": "#D6845A", "fill-opacity": 0.15 } });
+    map.addLayer({ id: "drawbox-line", type: "line", source: "drawbox", paint: { "line-color": "#D6845A", "line-width": 2, "line-dasharray": [2, 2] } });
+  }
+};
+document.addEventListener("keydown", e => { if (e.key === "Escape" && drawMode) drawCleanup(); });
+function bindDraw() {
+  map.on("mousedown", e => { if (drawMode) { drawA = { lngLat: e.lngLat, point: e.point }; } });
+  map.on("mousemove", e => {
+    if (drawMode && drawA) map.getSource("drawbox").setData(boxGeo(drawA.lngLat, e.lngLat));
+  });
+  map.on("mouseup", async e => {
+    if (!drawMode || !drawA) return;
+    const a = drawA.point, b = e.point;
+    const feats = map.queryRenderedFeatures([
+      [Math.min(a.x, b.x), Math.min(a.y, b.y)],
+      [Math.max(a.x, b.x), Math.max(a.y, b.y)]
+    ], { layers: ["parcel-fill"] });
+    const seen = new Map();
+    for (const f of feats) if (f.id != null && !seen.has(f.id)) seen.set(f.id, f.properties.parcel_no);
+    drawCleanup();
+    if (!seen.size) { alert("No parcels inside the rectangle (zoom in until parcels are visible, then draw)."); return; }
+    if (seen.size > 500) { alert(`${seen.size} parcels in the box — that is too many for one selection (limit 500). Draw a smaller rectangle.`); return; }
+    const def = `Area selection ${new Date().toISOString().slice(0, 10)} (${seen.size} parcels)`;
+    const label = prompt(`${seen.size} parcel(s) inside the rectangle.\nName this selection:`, def);
+    if (label === null) return;
+    try {
+      const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=add_area`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ label: label || def, parcel_ids: [...seen.keys()] })
+      });
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      loadData();
+      setTimeout(() => alert(`Saved ✓ — ${d.parcels_linked} parcel(s) linked to "${label || def}". Find it in Operations and in the Research queue.`), 100);
+    } catch (err) { alert("Could not save the selection: " + err.message); }
+  });
+}
+
 /* ---------- boot & data ---------- */
 async function boot() {
   gate.style.display = "none";
@@ -367,6 +442,7 @@ async function boot() {
     container: "map",
     style: {
       version: 8,
+      glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
       sources: {
         osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors · Imagery © Esri · Geocoding © Nominatim" },
         esri: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }
@@ -379,6 +455,7 @@ async function boot() {
     center: [16.524, 43.557], zoom: 13.5
   });
   map.addControl(new maplibregl.NavigationControl());
+  bindDraw();
   map.on("load", loadData);
 }
 async function loadData() {
@@ -412,6 +489,10 @@ async function loadData() {
         paint: { "fill-color": ["get", "color"], "fill-opacity": 0.42 } });
       map.addLayer({ id: "parcel-line", type: "line", source: "parcels",
         paint: { "line-color": ["get", "color"], "line-width": 1.2 } });
+      map.addLayer({ id: "parcel-labels", type: "symbol", source: "parcels", minzoom: 16,
+        layout: { "text-field": ["get", "parcel_no"], "text-font": ["Open Sans Semibold"], "text-size": 11,
+                  "text-allow-overlap": false, "text-padding": 1 },
+        paint: { "text-color": "#E9E0C9", "text-halo-color": "#141F26", "text-halo-width": 1.3 } });
       map.addSource("pins", { type: "geojson", data: pinGeo });
       map.addLayer({ id: "pin-dots", type: "circle", source: "pins",
         paint: { "circle-radius": 7, "circle-color": "#D6845A", "circle-stroke-color": "#141F26", "circle-stroke-width": 2 } });
@@ -432,10 +513,10 @@ async function loadData() {
           `<br><span class="muted">parcel ${esc(p.parcel_no)}</span>` +
           (dl != null ? `<br><b style="color:${dl <= 10 ? "var(--crit)" : "var(--warn)"}">${dl} days left to respond</b>` : "")).addTo(map);
       });
-      map.on("click", "parcel-fill", e => openParcelPopup(e.features[0].properties, e.lngLat));
+      map.on("click", "parcel-fill", e => { if (!drawMode) openParcelPopup(e.features[0].properties, e.lngLat); });
       for (const l of ["parcel-fill", "pin-dots", "notice-dots"]) {
-        map.on("mouseenter", l, () => map.getCanvas().style.cursor = "pointer");
-        map.on("mouseleave", l, () => map.getCanvas().style.cursor = "");
+        map.on("mouseenter", l, () => { if (!drawMode) map.getCanvas().style.cursor = "pointer"; });
+        map.on("mouseleave", l, () => { if (!drawMode) map.getCanvas().style.cursor = ""; });
       }
       applyFilters();
     }
