@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Djedovina — obiteljska tvrtka koja sređuje stare zemljišne knjige u splitskom kraju. Vaša zemlja, u dobre ruke.">
+<title>Djedovina</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+:root{
+  --ground:#EFE8D6; --ground2:#E6DCC4; --ink:#2B2318; --ink-soft:#5A4F3D;
+  --olive:#5C6B3C; --olive-deep:#47542E; --sea:#1E4A56; --terra:#B65C33;
+  --card:#F7F2E6; --line:#CBBE9F; --wall:#DDD2B6;
+}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#16222A; --ground2:#111B22; --ink:#EDE4CE; --ink-soft:#B9AE94;
+    --olive:#93A467; --olive-deep:#A8B87E; --sea:#7FB4C4; --terra:#D6845A;
+    --card:#1D2B34; --line:#33454F; --wall:#1A2830;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#16222A; --ground2:#111B22; --ink:#EDE4CE; --ink-soft:#B9AE94;
+  --olive:#93A467; --olive-deep:#A8B87E; --sea:#7FB4C4; --terra:#D6845A;
+  --card:#1D2B34; --line:#33454F; --wall:#1A2830;
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto} .step,.stone{transition:none!important}}
+body{background:var(--ground);color:var(--ink);font-family:"Source Sans 3",system-ui,Arial,sans-serif;font-size:17px;line-height:1.6}
+a{color:var(--sea)}
+.wrap{max-width:880px;margin:0 auto;padding:0 24px}
+header{padding:20px 0 0}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.wordmark{font-family:"Cormorant Garamond",Georgia,serif;font-weight:700;font-size:28px;letter-spacing:.02em;color:var(--ink)}
+.wordmark .leaf{color:var(--olive)}
+.langs{display:flex;gap:4px;flex-wrap:wrap}
+.langs button{border:1px solid var(--line);background:transparent;color:var(--ink-soft);font:600 12px/1 "Source Sans 3",sans-serif;letter-spacing:.08em;padding:7px 9px;border-radius:3px;cursor:pointer}
+.langs button[aria-pressed="true"]{background:var(--olive);border-color:var(--olive);color:var(--ground)}
+.langs button:focus-visible{outline:2px solid var(--terra);outline-offset:2px}
+/* hero */
+.hero{padding:72px 0 56px;position:relative}
+.kicker{font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;font-size:22px;color:var(--olive-deep)}
+h1{font-family:"Cormorant Garamond",Georgia,serif;font-weight:600;font-size:clamp(38px,7vw,64px);line-height:1.06;text-wrap:balance;margin:14px 0 20px;max-width:15ch}
+.sub{max-width:58ch;font-size:19px;color:var(--ink-soft)}
+.cta{display:inline-block;margin-top:30px;background:var(--terra);color:#FBF6EA;text-decoration:none;font-weight:700;padding:14px 26px;border-radius:3px}
+.cta:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
+/* root line */
+.rootline{position:relative}
+.rootline::before{content:"";position:absolute;left:11px;top:0;bottom:0;width:2px;background:linear-gradient(var(--olive) 60%,transparent 0) 0 0/2px 14px repeat-y;opacity:.55}
+/* sections */
+section{padding:56px 0;border-top:1px solid var(--line)}
+h2{font-family:"Cormorant Garamond",Georgia,serif;font-weight:600;font-size:34px;margin-bottom:8px;text-wrap:balance}
+.sect-note{color:var(--ink-soft);max-width:60ch;margin-bottom:30px}
+/* pledge stones */
+.stones{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.stone{background:var(--card);border:1px solid var(--line);border-radius:2px 14px 3px 12px;padding:20px 18px;position:relative}
+.stone h3{font-family:"Cormorant Garamond",Georgia,serif;font-size:21px;margin-bottom:6px}
+.stone p{font-size:15px;color:var(--ink-soft)}
+.stone::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--olive);border-radius:2px 0 0 2px}
+/* steps */
+.steps{display:grid;gap:0}
+.step{display:grid;grid-template-columns:24px 1fr;gap:18px;padding:18px 0}
+.dot{width:24px;height:24px;border-radius:50%;background:var(--ground);border:2px solid var(--olive);color:var(--olive-deep);font:700 12px/20px "Source Sans 3",sans-serif;text-align:center;z-index:1}
+.step h3{font-family:"Cormorant Garamond",Georgia,serif;font-size:22px}
+.step p{color:var(--ink-soft);max-width:60ch}
+/* story */
+.story p{max-width:62ch;font-size:18px}
+.story .sig{margin-top:18px;font-family:"Cormorant Garamond",Georgia,serif;font-style:italic;color:var(--olive-deep);font-size:19px}
+/* contact */
+.contact{background:var(--ground2);border-top:1px solid var(--line)}
+.contact .box{background:var(--card);border:1px solid var(--line);padding:28px;border-radius:3px;max-width:640px}
+.contact .box p{color:var(--ink-soft);margin-bottom:16px}
+#enqForm{display:grid;gap:10px;margin-bottom:14px}
+#enqForm input,#enqForm textarea{width:100%;background:var(--ground);border:1px solid var(--line);border-radius:3px;color:var(--ink);padding:10px 12px;font:inherit}
+#enqForm button.cta{border:none;cursor:pointer;justify-self:start}
+#enqForm button.cta[disabled]{opacity:.6;cursor:default}
+footer{padding:34px 0 44px;color:var(--ink-soft);font-size:13px}
+.wallstrip{height:34px;background:
+  radial-gradient(28px 15px at 14px 18px, var(--wall) 96%, transparent) 0 0/56px 34px,
+  radial-gradient(24px 13px at 42px 8px, var(--wall) 96%, transparent) 0 0/56px 34px;
+  opacity:.8}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <div class="bar">
+    <div class="wordmark">Djedovina<span class="leaf"> ⌂</span></div>
+    <nav class="langs" id="langs" aria-label="Language"></nav>
+  </div>
+</header>
+
+<div class="wrap hero">
+  <div class="kicker">Vaša zemlja, u dobre ruke.</div>
+  <h1 data-i18n="hero_title"></h1>
+  <p class="sub" data-i18n="hero_sub"></p>
+  <a class="cta" href="#contact" data-i18n="cta"></a>
+</div>
+
+<div class="wallstrip" aria-hidden="true"></div>
+
+<section class="wrap" id="pledge">
+  <h2 data-i18n="pledge_title"></h2>
+  <p class="sect-note" data-i18n="pledge_note"></p>
+  <div class="stones">
+    <div class="stone"><h3 data-i18n="p1t"></h3><p data-i18n="p1"></p></div>
+    <div class="stone"><h3 data-i18n="p2t"></h3><p data-i18n="p2"></p></div>
+    <div class="stone"><h3 data-i18n="p3t"></h3><p data-i18n="p3"></p></div>
+    <div class="stone"><h3 data-i18n="p4t"></h3><p data-i18n="p4"></p></div>
+    <div class="stone"><h3 data-i18n="p5t"></h3><p data-i18n="p5"></p></div>
+  </div>
+</section>
+
+<section class="wrap" id="how">
+  <h2 data-i18n="how_title"></h2>
+  <p class="sect-note" data-i18n="how_note"></p>
+  <div class="steps rootline">
+    <div class="step"><div class="dot">1</div><div><h3 data-i18n="s1t"></h3><p data-i18n="s1"></p></div></div>
+    <div class="step"><div class="dot">2</div><div><h3 data-i18n="s2t"></h3><p data-i18n="s2"></p></div></div>
+    <div class="step"><div class="dot">3</div><div><h3 data-i18n="s3t"></h3><p data-i18n="s3"></p></div></div>
+    <div class="step"><div class="dot">4</div><div><h3 data-i18n="s4t"></h3><p data-i18n="s4"></p></div></div>
+    <div class="step"><div class="dot">5</div><div><h3 data-i18n="s5t"></h3><p data-i18n="s5"></p></div></div>
+  </div>
+</section>
+
+<section class="wrap story" id="story">
+  <h2 data-i18n="story_title"></h2>
+  <p data-i18n="story_body"></p>
+  <p class="sig" data-i18n="story_sig"></p>
+</section>
+
+<section class="contact" id="contact">
+  <div class="wrap">
+    <h2 data-i18n="contact_title"></h2>
+    <div class="box">
+      <p data-i18n="contact_body"></p>
+      <form id="enqForm" novalidate>
+        <input type="text" id="eqName" data-i18n-ph="form_name" autocomplete="name">
+        <input type="text" id="eqContact" data-i18n-ph="form_contact" autocomplete="email">
+        <input type="text" id="eqPlace" data-i18n-ph="form_place">
+        <textarea id="eqMsg" rows="4" data-i18n-ph="form_msg"></textarea>
+        <input type="text" id="eqWebsite" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0;border:0;padding:0">
+        <button type="submit" class="cta" id="eqSend" data-i18n="form_send"></button>
+        <p id="eqStatus" role="status" style="margin-top:10px;min-height:20px"></p>
+      </form>
+      <a href="mailto:zemlja@djedovina.hr" data-i18n="contact_btn" style="color:var(--olive)"></a>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap"><span data-i18n="footer_note"></span></footer>
+
+<script>
+const I18N = {
+hr:{_n:"HR",
+hero_title:"Djedovina zaslužuje red.",
+hero_sub:"Pomažemo obiteljima čija zemlja u Dalmaciji desetljećima stoji na djedovima i pradjedovima — sređujemo papire kako treba, o našem trošku, a kada dođe vrijeme, zemlju predajemo obitelji koja će je čuvati.",
+cta:"Razgovarajmo — bez obveze",
+pledge_title:"Naša obećanja vašoj obitelji",
+pledge_note:"Znamo što djedovina znači. Zato ovako radimo — svaki put, sa svakom obitelji.",
+p1t:"Vi odlučujete.",p1:"Ništa se ne potpisuje dok svaki nasljednik ne razumije — na svom jeziku.",
+p2t:"Papire plaćamo mi.",p2:"Odvjetnici, javni bilježnici, geodeti — o našem trošku, čak i ako odlučite ne prodati.",
+p3t:"Poštena, otvorena cijena.",p3:"Pokazujemo tržišne podatke na kojima se ponuda temelji.",
+p4t:"U dobre ruke.",p4:"Kažemo vam kome zemlja ide i što će s njom biti.",
+p5t:"Priča ostaje.",p5:"Bilježimo imena polja i povijest vaše obitelji i predajemo ih dalje.",
+how_title:"Kako to izgleda",
+how_note:"Pet koraka, bez žurbe. Većina obitelji prvi put razgovara s nama uz kavu.",
+s1t:"Jedan razgovor.",s1:"Ispričajte nam o zemlji — makar papiri stoje pedeset godina.",
+s2t:"Pronalazimo obitelj.",s2:"Tražimo svakog nasljednika, od Splita do Stuttgarta do Sydneya.",
+s3t:"Sređujemo vlasništvo.",s3:"Ostavine, ispravke, upisi — naši odvjetnici vode sve postupke.",
+s4t:"Odlučujete zajedno.",s4:"Prodati, zadržati ili podijeliti — s čistim papirima sva su vrata otvorena.",
+s5t:"Primopredaja kako treba.",s5:"Kod javnog bilježnika, na vašem jeziku, javno i uredno.",
+story_title:"Zašto ovo radimo",
+story_body:"Pola Dalmacije na papiru pripada ljudima kojih više nema. Polja čekaju, obitelji su raštrkane po svijetu, a nitko nema vremena ni volje za sudove i katastar. Mi smo mala obiteljska tvrtka iz okolice Splita: spajamo strpljiv rad s dokumentima i poštovanje prema onome što zemlja obitelji znači. Zemlju ne 'otkupljujemo' — preuzimamo je na čuvanje, javno i pošteno.",
+story_sig:"Iz obitelji — u obitelj.",
+contact_title:"Kada dođe vrijeme",
+contact_body:"Javite nam se na hrvatskom, engleskom ili njemačkom. Prvi razgovor ništa ne obvezuje — i ništa ne košta.",
+contact_btn:"Pišite nam",
+form_name:"Ime i prezime",form_contact:"E-mail ili telefon",form_place:"Gdje je zemlja? (mjesto, općina)",form_msg:"Poruka (nije obavezno)",form_send:"Pošaljite upit",form_sent:"Hvala! Javit ćemo se u roku od dva radna dana.",form_err:"Slanje nije uspjelo — pokušajte ponovno ili nam pišite e-mailom.",form_req:"Molimo upišite ime i kontakt.",
+footer_note:"Djedovina — radni naziv. Stranica je nacrt; podaci za kontakt su privremeni."},
+en:{_n:"EN",
+hero_title:"Your family's land, into good hands.",
+hero_sub:"We help families whose Dalmatian land has stood in a grandparent's name for decades — we settle the paperwork properly, at our cost, and when the time comes we pass the land to a family who will care for it.",
+cta:"Talk to us — no obligation",
+pledge_title:"Our pledge to your family",
+pledge_note:"We know what a djedovina — a grandfather's land — means. So this is how we work, every time.",
+p1t:"You decide.",p1:"Nothing is signed until every heir understands — in their own language.",
+p2t:"We pay for the paperwork.",p2:"Lawyers, notaries, surveyors — at our cost, even if you choose not to sell.",
+p3t:"A fair, open price.",p3:"We show the market data our offer is built on.",
+p4t:"Into good hands.",p4:"We tell you who the land is going to, and what will become of it.",
+p5t:"The story stays.",p5:"We record the field names and your family's history, and pass them on.",
+how_title:"How it works",
+how_note:"Five steps, no hurry. Most families first talk to us over coffee.",
+s1t:"One conversation.",s1:"Tell us about the land — even if the papers have slept for fifty years.",
+s2t:"We find the family.",s2:"We trace every heir, from Split to Stuttgart to Sydney.",
+s3t:"We settle the title.",s3:"Probate, corrections, registrations — our lawyers handle every proceeding.",
+s4t:"You decide together.",s4:"Sell, keep, or divide — with clean papers, every door is open.",
+s5t:"A proper handover.",s5:"Signed at the notary, in your language, done openly.",
+story_title:"Why we do this",
+story_body:"Half of Dalmatia belongs, on paper, to people who are gone. The fields wait, the families are scattered across the world, and nobody has the time or heart for courts and cadastres. We are a small family company from near Split, joining patient work on documents with respect for what the land means. We don't 'buy up' land — we take it into care, openly and fairly.",
+story_sig:"From one family — to another.",
+contact_title:"When the time comes",
+contact_body:"Write to us in English, Croatian or German. The first conversation costs nothing and commits you to nothing.",
+contact_btn:"Write to us",
+form_name:"Full name",form_contact:"Email or phone",form_place:"Where is the land? (place, municipality)",form_msg:"Message (optional)",form_send:"Send enquiry",form_sent:"Thank you! We will reply within two working days.",form_err:"Sending failed — please try again, or write to us by email.",form_req:"Please fill in your name and a way to reach you.",
+footer_note:"Djedovina — working name. This page is a draft; contact details are placeholders."},
+de:{_n:"DE",
+hero_title:"Das Land Ihrer Familie, in gute Hände.",
+hero_sub:"Wir helfen Familien, deren Land in Dalmatien seit Jahrzehnten auf den Großvater eingetragen ist — wir bringen die Papiere in Ordnung, auf unsere Kosten, und übergeben das Land, wenn die Zeit kommt, einer Familie, die es pflegen wird.",
+cta:"Sprechen Sie mit uns — unverbindlich",
+pledge_title:"Unser Versprechen an Ihre Familie",
+pledge_note:"Wir wissen, was eine Djedovina — das Land des Großvaters — bedeutet. Deshalb arbeiten wir so, jedes Mal.",
+p1t:"Sie entscheiden.",p1:"Nichts wird unterschrieben, bevor jeder Erbe alles versteht — in seiner Sprache.",
+p2t:"Die Papiere zahlen wir.",p2:"Anwälte, Notare, Vermesser — auf unsere Kosten, auch wenn Sie nicht verkaufen.",
+p3t:"Ein fairer, offener Preis.",p3:"Wir zeigen die Marktdaten, auf denen unser Angebot beruht.",
+p4t:"In gute Hände.",p4:"Wir sagen Ihnen, an wen das Land geht und was daraus wird.",
+p5t:"Die Geschichte bleibt.",p5:"Wir halten Flurnamen und Familiengeschichte fest und geben sie weiter.",
+how_title:"So läuft es ab",
+how_note:"Fünf Schritte, ohne Eile. Die meisten Familien sprechen zuerst bei einem Kaffee mit uns.",
+s1t:"Ein Gespräch.",s1:"Erzählen Sie uns vom Land — auch wenn die Papiere fünfzig Jahre alt sind.",
+s2t:"Wir finden die Familie.",s2:"Wir suchen jeden Erben, von Split über Stuttgart bis Sydney.",
+s3t:"Wir klären das Eigentum.",s3:"Nachlass, Berichtigungen, Eintragungen — unsere Anwälte führen alle Verfahren.",
+s4t:"Sie entscheiden gemeinsam.",s4:"Verkaufen, behalten oder teilen — mit sauberen Papieren stehen alle Türen offen.",
+s5t:"Eine ordentliche Übergabe.",s5:"Beim Notar, in Ihrer Sprache, offen und korrekt.",
+story_title:"Warum wir das tun",
+story_body:"Halb Dalmatien gehört auf dem Papier Menschen, die nicht mehr leben. Die Felder warten, die Familien sind über die Welt verstreut, und niemand hat Zeit und Kraft für Gerichte und Kataster. Wir sind ein kleines Familienunternehmen bei Split: geduldige Arbeit an Dokumenten, verbunden mit Respekt vor dem, was das Land bedeutet. Wir 'kaufen nicht auf' — wir nehmen das Land in Obhut, offen und fair.",
+story_sig:"Von einer Familie — an eine Familie.",
+contact_title:"Wenn die Zeit gekommen ist",
+contact_body:"Schreiben Sie uns auf Deutsch, Kroatisch oder Englisch. Das erste Gespräch kostet nichts und verpflichtet zu nichts.",
+contact_btn:"Schreiben Sie uns",
+form_name:"Vor- und Nachname",form_contact:"E-Mail oder Telefon",form_place:"Wo liegt das Grundstück? (Ort, Gemeinde)",form_msg:"Nachricht (optional)",form_send:"Anfrage senden",form_sent:"Vielen Dank! Wir melden uns innerhalb von zwei Arbeitstagen.",form_err:"Senden fehlgeschlagen — bitte erneut versuchen oder per E-Mail schreiben.",form_req:"Bitte Name und Kontakt angeben.",
+footer_note:"Djedovina — Arbeitstitel. Diese Seite ist ein Entwurf; Kontaktdaten sind Platzhalter."},
+it:{_n:"IT",
+hero_title:"La terra della vostra famiglia, in buone mani.",
+hero_sub:"Aiutiamo le famiglie la cui terra in Dalmazia è intestata da decenni a un nonno — mettiamo in ordine le carte, a nostre spese, e quando arriva il momento affidiamo la terra a una famiglia che ne avrà cura.",
+cta:"Parliamone — senza impegno",
+pledge_title:"La nostra promessa alla vostra famiglia",
+pledge_note:"Sappiamo cosa significa una djedovina — la terra del nonno. Per questo lavoriamo così, ogni volta.",
+p1t:"Decidete voi.",p1:"Non si firma nulla finché ogni erede non ha capito — nella propria lingua.",
+p2t:"Le carte le paghiamo noi.",p2:"Avvocati, notai, geometri — a nostre spese, anche se scegliete di non vendere.",
+p3t:"Un prezzo giusto e trasparente.",p3:"Mostriamo i dati di mercato su cui si basa la nostra offerta.",
+p4t:"In buone mani.",p4:"Vi diciamo a chi va la terra e cosa ne sarà.",
+p5t:"La storia resta.",p5:"Registriamo i nomi dei campi e la storia della famiglia, e li tramandiamo.",
+how_title:"Come funziona",
+how_note:"Cinque passi, senza fretta. Molte famiglie ci parlano la prima volta davanti a un caffè.",
+s1t:"Una conversazione.",s1:"Raccontateci della terra — anche se le carte dormono da cinquant'anni.",
+s2t:"Troviamo la famiglia.",s2:"Rintracciamo ogni erede, da Spalato a Stoccarda a Sydney.",
+s3t:"Sistemiamo la proprietà.",s3:"Successioni, rettifiche, iscrizioni — i nostri avvocati seguono ogni pratica.",
+s4t:"Decidete insieme.",s4:"Vendere, tenere o dividere — con le carte in regola ogni porta è aperta.",
+s5t:"Una consegna come si deve.",s5:"Dal notaio, nella vostra lingua, alla luce del sole.",
+story_title:"Perché lo facciamo",
+story_body:"Metà della Dalmazia appartiene, sulla carta, a persone che non ci sono più. I campi aspettano, le famiglie sono sparse per il mondo, e nessuno ha tempo e cuore per tribunali e catasto. Siamo una piccola impresa familiare vicino a Spalato: lavoro paziente sui documenti e rispetto per ciò che la terra significa. Non 'compriamo terreni' — li prendiamo in custodia, apertamente e onestamente.",
+story_sig:"Da una famiglia — a una famiglia.",
+contact_title:"Quando arriva il momento",
+contact_body:"Scriveteci in italiano, croato o inglese. Il primo colloquio non costa nulla e non impegna a nulla.",
+contact_btn:"Scriveteci",
+form_name:"Nome e cognome",form_contact:"Email o telefono",form_place:"Dove si trova il terreno? (località, comune)",form_msg:"Messaggio (facoltativo)",form_send:"Invia richiesta",form_sent:"Grazie! Risponderemo entro due giorni lavorativi.",form_err:"Invio non riuscito — riprovate o scriveteci per email.",form_req:"Inserite nome e un contatto.",
+footer_note:"Djedovina — nome provvisorio. Questa pagina è una bozza; i contatti sono provvisori."},
+es:{_n:"ES",
+hero_title:"La tierra de su familia, en buenas manos.",
+hero_sub:"Ayudamos a familias cuya tierra en Dalmacia lleva décadas a nombre de un abuelo: ponemos los papeles en orden, a nuestro cargo, y cuando llega el momento entregamos la tierra a una familia que la cuidará.",
+cta:"Hablemos — sin compromiso",
+pledge_title:"Nuestra promesa a su familia",
+pledge_note:"Sabemos lo que significa una djedovina — la tierra del abuelo. Por eso trabajamos así, siempre.",
+p1t:"Ustedes deciden.",p1:"No se firma nada hasta que cada heredero lo entienda — en su propio idioma.",
+p2t:"Los papeles los pagamos nosotros.",p2:"Abogados, notarios, topógrafos — a nuestro cargo, incluso si deciden no vender.",
+p3t:"Un precio justo y abierto.",p3:"Mostramos los datos de mercado en que se basa nuestra oferta.",
+p4t:"En buenas manos.",p4:"Les decimos a quién va la tierra y qué será de ella.",
+p5t:"La historia permanece.",p5:"Registramos los nombres de los campos y la historia familiar, y los transmitimos.",
+how_title:"Cómo funciona",
+how_note:"Cinco pasos, sin prisa. La mayoría de las familias nos habla por primera vez con un café.",
+s1t:"Una conversación.",s1:"Cuéntennos sobre la tierra — aunque los papeles duerman desde hace cincuenta años.",
+s2t:"Encontramos a la familia.",s2:"Localizamos a cada heredero, de Split a Stuttgart a Sídney.",
+s3t:"Arreglamos la titularidad.",s3:"Herencias, rectificaciones, inscripciones — nuestros abogados llevan cada trámite.",
+s4t:"Deciden juntos.",s4:"Vender, conservar o dividir — con papeles limpios, todas las puertas están abiertas.",
+s5t:"Una entrega como es debido.",s5:"Ante notario, en su idioma, a la vista de todos.",
+story_title:"Por qué lo hacemos",
+story_body:"Media Dalmacia pertenece, sobre el papel, a personas que ya no están. Los campos esperan, las familias están repartidas por el mundo y nadie tiene tiempo ni ánimo para juzgados y catastros. Somos una pequeña empresa familiar cerca de Split: trabajo paciente con los documentos y respeto por lo que la tierra significa. No 'compramos terrenos' — los tomamos a nuestro cuidado, abierta y honestamente.",
+story_sig:"De una familia — a otra familia.",
+contact_title:"Cuando llegue el momento",
+contact_body:"Escríbannos en español, croata o inglés. La primera conversación no cuesta nada y no compromete a nada.",
+contact_btn:"Escríbannos",
+form_name:"Nombre y apellidos",form_contact:"Correo o teléfono",form_place:"¿Dónde está el terreno? (lugar, municipio)",form_msg:"Mensaje (opcional)",form_send:"Enviar consulta",form_sent:"¡Gracias! Responderemos en dos días laborables.",form_err:"No se pudo enviar — inténtelo de nuevo o escríbanos por correo.",form_req:"Indique su nombre y un contacto.",
+footer_note:"Djedovina — nombre provisional. Esta página es un borrador; los datos de contacto son provisionales."},
+fr:{_n:"FR",
+hero_title:"La terre de votre famille, en de bonnes mains.",
+hero_sub:"Nous aidons les familles dont la terre en Dalmatie est restée au nom d'un grand-père pendant des décennies : nous mettons les papiers en ordre, à nos frais, et le moment venu nous confions la terre à une famille qui en prendra soin.",
+cta:"Parlons-en — sans engagement",
+pledge_title:"Notre promesse à votre famille",
+pledge_note:"Nous savons ce que signifie une djedovina — la terre du grand-père. C'est pourquoi nous travaillons ainsi, à chaque fois.",
+p1t:"C'est vous qui décidez.",p1:"Rien n'est signé tant que chaque héritier n'a pas compris — dans sa langue.",
+p2t:"Les papiers sont à notre charge.",p2:"Avocats, notaires, géomètres — à nos frais, même si vous choisissez de ne pas vendre.",
+p3t:"Un prix juste et transparent.",p3:"Nous montrons les données de marché sur lesquelles repose notre offre.",
+p4t:"En de bonnes mains.",p4:"Nous vous disons à qui va la terre et ce qu'elle deviendra.",
+p5t:"L'histoire demeure.",p5:"Nous consignons les noms des champs et l'histoire de la famille, et nous les transmettons.",
+how_title:"Comment cela se passe",
+how_note:"Cinq étapes, sans hâte. La plupart des familles nous parlent d'abord autour d'un café.",
+s1t:"Une conversation.",s1:"Parlez-nous de la terre — même si les papiers dorment depuis cinquante ans.",
+s2t:"Nous retrouvons la famille.",s2:"Nous recherchons chaque héritier, de Split à Stuttgart à Sydney.",
+s3t:"Nous réglons la propriété.",s3:"Successions, rectifications, inscriptions — nos avocats mènent chaque procédure.",
+s4t:"Vous décidez ensemble.",s4:"Vendre, garder ou partager — avec des papiers en règle, toutes les portes sont ouvertes.",
+s5t:"Une remise dans les règles.",s5:"Chez le notaire, dans votre langue, au grand jour.",
+story_title:"Pourquoi nous faisons cela",
+story_body:"La moitié de la Dalmatie appartient, sur le papier, à des personnes disparues. Les champs attendent, les familles sont dispersées dans le monde, et personne n'a le temps ni le cœur pour les tribunaux et le cadastre. Nous sommes une petite entreprise familiale près de Split : un travail patient sur les documents, et du respect pour ce que la terre représente. Nous n'« achetons pas des terrains » — nous les prenons en garde, ouvertement et honnêtement.",
+story_sig:"D'une famille — à une famille.",
+contact_title:"Le moment venu",
+contact_body:"Écrivez-nous en français, en croate ou en anglais. Le premier échange ne coûte rien et n'engage à rien.",
+contact_btn:"Écrivez-nous",
+form_name:"Nom et prénom",form_contact:"E-mail ou téléphone",form_place:"Où se trouve le terrain ? (lieu, commune)",form_msg:"Message (facultatif)",form_send:"Envoyer la demande",form_sent:"Merci ! Nous répondrons sous deux jours ouvrés.",form_err:"Échec de l'envoi — réessayez ou écrivez-nous par e-mail.",form_req:"Merci d'indiquer votre nom et un moyen de contact.",
+footer_note:"Djedovina — nom provisoire. Cette page est une ébauche ; les coordonnées sont provisoires."},
+pl:{_n:"PL",
+hero_title:"Ziemia Waszej rodziny, w dobre ręce.",
+hero_sub:"Pomagamy rodzinom, których ziemia w Dalmacji od dziesięcioleci zapisana jest na dziadka — porządkujemy dokumenty na nasz koszt, a gdy przyjdzie czas, przekazujemy ziemię rodzinie, która o nią zadba.",
+cta:"Porozmawiajmy — bez zobowiązań",
+pledge_title:"Nasza obietnica dla Waszej rodziny",
+pledge_note:"Wiemy, co znaczy djedovina — ziemia dziadka. Dlatego pracujemy właśnie tak, za każdym razem.",
+p1t:"Wy decydujecie.",p1:"Nic nie zostaje podpisane, dopóki każdy spadkobierca nie zrozumie — w swoim języku.",
+p2t:"Dokumenty opłacamy my.",p2:"Prawnicy, notariusze, geodeci — na nasz koszt, nawet jeśli zdecydujecie się nie sprzedawać.",
+p3t:"Uczciwa, jawna cena.",p3:"Pokazujemy dane rynkowe, na których opiera się nasza oferta.",
+p4t:"W dobre ręce.",p4:"Mówimy Wam, do kogo trafia ziemia i co się z nią stanie.",
+p5t:"Historia zostaje.",p5:"Zapisujemy nazwy pól i historię rodziny — i przekazujemy je dalej.",
+how_title:"Jak to wygląda",
+how_note:"Pięć kroków, bez pośpiechu. Większość rodzin pierwszy raz rozmawia z nami przy kawie.",
+s1t:"Jedna rozmowa.",s1:"Opowiedzcie nam o ziemi — nawet jeśli papiery leżą od pięćdziesięciu lat.",
+s2t:"Odnajdujemy rodzinę.",s2:"Szukamy każdego spadkobiercy — od Splitu przez Stuttgart po Sydney.",
+s3t:"Porządkujemy własność.",s3:"Spadki, sprostowania, wpisy — nasi prawnicy prowadzą wszystkie postępowania.",
+s4t:"Decydujecie razem.",s4:"Sprzedać, zatrzymać czy podzielić — z czystymi papierami wszystkie drzwi stoją otworem.",
+s5t:"Przekazanie jak należy.",s5:"U notariusza, w Waszym języku, jawnie i porządnie.",
+story_title:"Dlaczego to robimy",
+story_body:"Pół Dalmacji należy, na papierze, do ludzi, których już nie ma. Pola czekają, rodziny są rozsiane po świecie, a nikt nie ma czasu ani serca do sądów i katastru. Jesteśmy małą rodzinną firmą spod Splitu: cierpliwa praca nad dokumentami i szacunek dla tego, czym ziemia jest dla rodziny. Nie 'skupujemy' ziemi — bierzemy ją pod opiekę, jawnie i uczciwie.",
+story_sig:"Od rodziny — dla rodziny.",
+contact_title:"Gdy przyjdzie czas",
+contact_body:"Napiszcie do nas po polsku, chorwacku lub angielsku. Pierwsza rozmowa nic nie kosztuje i do niczego nie zobowiązuje.",
+contact_btn:"Napiszcie do nas",
+form_name:"Imię i nazwisko",form_contact:"E-mail lub telefon",form_place:"Gdzie jest ziemia? (miejscowość, gmina)",form_msg:"Wiadomość (opcjonalnie)",form_send:"Wyślij zapytanie",form_sent:"Dziękujemy! Odpowiemy w ciągu dwóch dni roboczych.",form_err:"Wysyłka nie powiodła się — spróbuj ponownie lub napisz e-mail.",form_req:"Podaj imię i sposób kontaktu.",
+footer_note:"Djedovina — nazwa robocza. Ta strona to szkic; dane kontaktowe są tymczasowe."},
+nl:{_n:"NL",
+hero_title:"De grond van uw familie, in goede handen.",
+hero_sub:"Wij helpen families van wie de grond in Dalmatië al tientallen jaren op naam van een grootvader staat — wij brengen de papieren op orde, op onze kosten, en dragen de grond te zijner tijd over aan een familie die ervoor zal zorgen.",
+cta:"Praat met ons — vrijblijvend",
+pledge_title:"Onze belofte aan uw familie",
+pledge_note:"Wij weten wat een djedovina — grootvaders land — betekent. Daarom werken wij zo, elke keer weer.",
+p1t:"U beslist.",p1:"Er wordt niets getekend voordat elke erfgenaam het begrijpt — in de eigen taal.",
+p2t:"De papieren betalen wij.",p2:"Advocaten, notarissen, landmeters — op onze kosten, ook als u besluit niet te verkopen.",
+p3t:"Een eerlijke, open prijs.",p3:"Wij tonen de marktgegevens waarop ons bod is gebaseerd.",
+p4t:"In goede handen.",p4:"Wij vertellen u aan wie de grond gaat en wat ermee gebeurt.",
+p5t:"Het verhaal blijft.",p5:"Wij leggen de veldnamen en de familiegeschiedenis vast en geven ze door.",
+how_title:"Zo werkt het",
+how_note:"Vijf stappen, zonder haast. De meeste families spreken ons voor het eerst bij een kop koffie.",
+s1t:"Eén gesprek.",s1:"Vertel ons over de grond — ook als de papieren al vijftig jaar stilliggen.",
+s2t:"Wij vinden de familie.",s2:"Wij sporen elke erfgenaam op, van Split tot Stuttgart tot Sydney.",
+s3t:"Wij regelen de eigendom.",s3:"Nalatenschappen, correcties, inschrijvingen — onze advocaten voeren elke procedure.",
+s4t:"U beslist samen.",s4:"Verkopen, houden of verdelen — met schone papieren staan alle deuren open.",
+s5t:"Een nette overdracht.",s5:"Bij de notaris, in uw taal, open en correct.",
+story_title:"Waarom wij dit doen",
+story_body:"Half Dalmatië is op papier van mensen die er niet meer zijn. De velden wachten, de families zijn over de wereld verspreid, en niemand heeft tijd of zin in rechtbanken en kadasters. Wij zijn een klein familiebedrijf bij Split: geduldig documentenwerk, met respect voor wat de grond betekent. Wij 'kopen geen grond op' — wij nemen die in bewaring, open en eerlijk.",
+story_sig:"Van familie — naar familie.",
+contact_title:"Als de tijd rijp is",
+contact_body:"Schrijf ons in het Nederlands, Kroatisch of Engels. Het eerste gesprek kost niets en verplicht u tot niets.",
+contact_btn:"Schrijf ons",
+form_name:"Voor- en achternaam",form_contact:"E-mail of telefoon",form_place:"Waar ligt de grond? (plaats, gemeente)",form_msg:"Bericht (optioneel)",form_send:"Verstuur aanvraag",form_sent:"Dank u! We reageren binnen twee werkdagen.",form_err:"Versturen mislukt — probeer opnieuw of mail ons.",form_req:"Vul uw naam en een contactgegeven in.",
+footer_note:"Djedovina — werknaam. Deze pagina is een concept; contactgegevens zijn tijdelijk."},
+sv:{_n:"SV",
+hero_title:"Er familjs mark, i goda händer.",
+hero_sub:"Vi hjälper familjer vars mark i Dalmatien i årtionden stått skriven på en farfar — vi ordnar papperen ordentligt, på vår bekostnad, och när tiden är inne lämnar vi marken vidare till en familj som kommer att vårda den.",
+cta:"Prata med oss — utan förpliktelser",
+pledge_title:"Vårt löfte till er familj",
+pledge_note:"Vi vet vad en djedovina — farfars mark — betyder. Därför arbetar vi så här, varje gång.",
+p1t:"Ni bestämmer.",p1:"Inget skrivs under förrän varje arvinge förstår — på sitt eget språk.",
+p2t:"Papperen betalar vi.",p2:"Advokater, notarier, lantmätare — på vår bekostnad, även om ni väljer att inte sälja.",
+p3t:"Ett rättvist, öppet pris.",p3:"Vi visar marknadsdatan som vårt bud bygger på.",
+p4t:"I goda händer.",p4:"Vi berättar vem marken går till och vad som händer med den.",
+p5t:"Berättelsen stannar kvar.",p5:"Vi tecknar ner fältens namn och familjens historia och för dem vidare.",
+how_title:"Så går det till",
+how_note:"Fem steg, utan brådska. De flesta familjer pratar först med oss över en kopp kaffe.",
+s1t:"Ett samtal.",s1:"Berätta om marken — även om papperen legat orörda i femtio år.",
+s2t:"Vi hittar familjen.",s2:"Vi spårar varje arvinge, från Split till Stuttgart till Sydney.",
+s3t:"Vi ordnar ägandet.",s3:"Arvskiften, rättelser, inskrivningar — våra jurister sköter varje ärende.",
+s4t:"Ni bestämmer tillsammans.",s4:"Sälja, behålla eller dela — med rena papper står alla dörrar öppna.",
+s5t:"En ordentlig överlämning.",s5:"Hos notarien, på ert språk, öppet och korrekt.",
+story_title:"Varför vi gör detta",
+story_body:"Halva Dalmatien tillhör, på papperet, människor som inte längre finns. Fälten väntar, familjerna är utspridda över världen, och ingen har tid eller ork för domstolar och fastighetsregister. Vi är ett litet familjeföretag utanför Split: tålmodigt arbete med dokument, och respekt för vad marken betyder. Vi 'köper inte upp' mark — vi tar den i vård, öppet och ärligt.",
+story_sig:"Från en familj — till en familj.",
+contact_title:"När tiden är inne",
+contact_body:"Skriv till oss på svenska, kroatiska eller engelska. Det första samtalet kostar inget och förpliktar till inget.",
+contact_btn:"Skriv till oss",
+form_name:"För- och efternamn",form_contact:"E-post eller telefon",form_place:"Var ligger marken? (ort, kommun)",form_msg:"Meddelande (valfritt)",form_send:"Skicka förfrågan",form_sent:"Tack! Vi svarar inom två arbetsdagar.",form_err:"Det gick inte att skicka — försök igen eller mejla oss.",form_req:"Ange namn och ett sätt att nå dig.",
+footer_note:"Djedovina — arbetsnamn. Sidan är ett utkast; kontaktuppgifterna är tillfälliga."}
+};
+const ORDER = ["hr","en","de","it","es","fr","pl","nl","sv"];
+let saved=null; try{saved=localStorage.getItem("djedovina-lang")}catch(e){}
+let current = saved && I18N[saved] ? saved :
+  (ORDER.find(l=>(navigator.language||"en").toLowerCase().startsWith(l)) || "hr");
+const nav=document.getElementById("langs");
+ORDER.forEach(l=>{
+  const b=document.createElement("button");
+  b.textContent=I18N[l]._n; b.dataset.lang=l;
+  b.addEventListener("click",()=>setLang(l));
+  nav.appendChild(b);
+});
+function setLang(l){
+  current=l; try{localStorage.setItem("djedovina-lang",l)}catch(e){}
+  document.documentElement.lang=l;
+  const d=I18N[l];
+  document.querySelectorAll("[data-i18n]").forEach(el=>{ const k=el.dataset.i18n; if(d[k]!==undefined) el.textContent=d[k]; });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el=>{ const k=el.dataset.i18nPh; if(d[k]!==undefined) el.placeholder=d[k]; });
+  nav.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.lang===l)));
+}
+setLang(current);
+
+const ENQ_URL = "https://yunbpixnjktzaxbmdwad.supabase.co/functions/v1/map-data?what=enquiry";
+document.getElementById("enqForm").addEventListener("submit", async function (ev) {
+  ev.preventDefault();
+  const d = I18N[current];
+  const st = document.getElementById("eqStatus");
+  const name = document.getElementById("eqName").value.trim();
+  const contact = document.getElementById("eqContact").value.trim();
+  if (!name || !contact) { st.style.color = "var(--terra)"; st.textContent = d.form_req; return; }
+  const btn = document.getElementById("eqSend");
+  btn.disabled = true; st.style.color = "var(--ink-soft)"; st.textContent = "…";
+  try {
+    const r = await fetch(ENQ_URL, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, contact,
+        place: document.getElementById("eqPlace").value.trim(),
+        message: document.getElementById("eqMsg").value.trim(),
+        website: document.getElementById("eqWebsite").value,
+        lang: current })
+    });
+    const out = await r.json();
+    if (!r.ok || out.error) throw new Error(out.error || r.status);
+    st.style.color = "var(--olive)"; st.textContent = d.form_sent;
+    this.reset();
+  } catch (e) {
+    st.style.color = "var(--terra)"; st.textContent = d.form_err;
+  }
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
