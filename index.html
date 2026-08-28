@@ -56,7 +56,6 @@ aside h2{font-size:15px;margin-bottom:8px}
 table{border-collapse:collapse;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
 th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13.5px}
 th{background:var(--panel2);color:var(--ink2);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
-tr:hover td{background:var(--pan2)}
 tr:hover td{background:var(--panel2)}
 .tblwrap{overflow-x:auto;border-radius:8px}
 .stgsel{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 6px;max-width:210px}
@@ -64,6 +63,16 @@ tr:hover td{background:var(--panel2)}
 .num{font-variant-numeric:tabular-nums}
 .loc{cursor:pointer;color:var(--sea)}
 .empty{padding:26px;text-align:center;color:var(--ink2);border:1px dashed var(--line);border-radius:8px;background:var(--panel)}
+#bellBtn{position:relative}
+#bellN{position:absolute;top:-6px;right:-6px;background:var(--terra);color:var(--bg);border-radius:999px;font-size:10.5px;font-weight:700;padding:1px 5px;display:none}
+.swrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.sw{appearance:none;width:38px;height:20px;background:var(--line);border-radius:999px;position:relative;cursor:pointer;border:none;flex:none}
+.sw:checked{background:var(--olive)}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--ink);transition:left .15s}
+.sw:checked::after{left:20px}
+.alert{border-top:1px solid var(--line);padding:7px 0;font-size:12.5px}
+.alert:first-of-type{border-top:none}
+.alert .when{color:var(--ink2);font-size:11px}
 #gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
 #gate .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:28px;max-width:380px;text-align:center}
 #gate input{width:100%;margin:14px 0;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink)}
@@ -99,6 +108,7 @@ tr:hover td{background:var(--panel2)}
   </div>
   <span id="stats">loading…</span>
   <div class="spacer"></div>
+  <button id="bellBtn" title="Notifications">🔔<span id="bellN"></span></button>
   <button id="filtersBtn">Filters</button>
   <button id="noticesBtn">Court notices</button>
   <button id="refreshBtn" title="Reload data from the database">Refresh</button>
@@ -136,6 +146,14 @@ tr:hover td{background:var(--panel2)}
 <main>
   <div id="map"></div>
   <aside id="side"><h2>Live court notices <span class="muted" id="ncount"></span></h2><div id="nlist"></div></aside>
+
+  <aside id="alertsSide">
+    <h2>Notifications</h2>
+    <div class="swrow"><span>Notifications on</span><input type="checkbox" class="sw" id="swOn"></div>
+    <div class="swrow"><span>Include new court notices</span><input type="checkbox" class="sw" id="swNotices"></div>
+    <p class="muted" style="margin:8px 0 4px;font-size:12px">Every change to prospects, contacts, tasks, owners and engagements is audit-logged in the database; this panel shows what happened since you last looked.</p>
+    <div id="alist"></div>
+  </aside>
 
   <div class="oview" id="opsView">
     <h2>Operations — the working pipeline</h2>
@@ -252,6 +270,7 @@ async function loadData() {
       api("what=status", KEY), api("what=parcels", KEY), api("what=notices", KEY), api("what=pins", KEY), api("what=ops", KEY)
     ]);
     opsData = ops || [];
+    if (status.notify) notifyPref = status.notify;
     document.getElementById("stats").textContent =
       `${status.parcels ?? 0} parcels · tiles ${status.tiles_done ?? 0}/${status.tiles_total ?? 0} · ${opsData.length} prospects · ${status.notices ?? 0} notices`;
     for (const f of parcels.features) f.properties.color = stageColor(f.properties.stage);
@@ -287,6 +306,7 @@ async function loadData() {
       applyFilters();
     }
     renderNotices(notices);
+    loadAlerts();
     if (document.getElementById("opsView").classList.contains("open")) renderOps();
     if (document.getElementById("salesView").classList.contains("open")) renderSales();
   } catch (e) {
@@ -501,9 +521,69 @@ async function pickResult(it) {
 }
 
 document.getElementById("noticesBtn").onclick = function () {
+  document.getElementById("alertsSide").classList.remove("open");
+  document.getElementById("bellBtn").classList.remove("on");
   const s = document.getElementById("side"); s.classList.toggle("open"); this.classList.toggle("on");
 };
 document.getElementById("refreshBtn").onclick = loadData;
+
+/* ---------- notifications ---------- */
+let notifyPref = { enabled: true, include_notices: true };
+let alertItems = [];
+const SEEN = "djedovina-alert-seen";
+function seenSince() {
+  let s = null; try { s = localStorage.getItem(SEEN); } catch (e) {}
+  return s || new Date(Date.now() - 7 * 864e5).toISOString();
+}
+async function loadAlerts() {
+  try {
+    const d = await api(`what=alerts&since=${encodeURIComponent(seenSince())}`, KEY);
+    notifyPref.enabled = !!d.enabled;
+    alertItems = d.items || [];
+    const badge = document.getElementById("bellN");
+    if (notifyPref.enabled && alertItems.length && !document.getElementById("alertsSide").classList.contains("open")) {
+      badge.textContent = alertItems.length > 99 ? "99+" : alertItems.length;
+      badge.style.display = "block";
+    } else {
+      badge.style.display = "none";
+    }
+    renderAlerts();
+  } catch (e) { /* quiet */ }
+}
+function renderAlerts() {
+  document.getElementById("swOn").checked = notifyPref.enabled;
+  document.getElementById("swNotices").checked = notifyPref.include_notices;
+  const el = document.getElementById("alist");
+  if (!notifyPref.enabled) { el.innerHTML = `<p class="muted">Notifications are switched off.</p>`; return; }
+  el.innerHTML = alertItems.length ? alertItems.map(a =>
+    `<div class="alert"><span class="when">${esc((a.at || "").replace("T", " ").slice(0, 16))} · ${a.kind === "notice" ? "court" : "change"}</span><br>${esc(a.text)}</div>`
+  ).join("") : `<p class="muted">Nothing new since you last looked.</p>`;
+}
+document.getElementById("bellBtn").onclick = function () {
+  document.getElementById("side").classList.remove("open");
+  document.getElementById("noticesBtn").classList.remove("on");
+  const s = document.getElementById("alertsSide");
+  const opening = !s.classList.contains("open");
+  s.classList.toggle("open"); this.classList.toggle("on");
+  if (opening) {
+    renderAlerts();
+  } else {
+    try { localStorage.setItem(SEEN, new Date().toISOString()); } catch (e) {}
+    document.getElementById("bellN").style.display = "none";
+  }
+};
+async function pushNotifyPref() {
+  const on = document.getElementById("swOn").checked ? "1" : "0";
+  const nt = document.getElementById("swNotices").checked ? "1" : "0";
+  try {
+    const d = await api(`what=notify_set&on=${on}&notices=${nt}`, KEY);
+    notifyPref = { enabled: d.enabled, include_notices: d.include_notices };
+  } catch (e) {}
+  loadAlerts();
+}
+document.getElementById("swOn").addEventListener("change", pushNotifyPref);
+document.getElementById("swNotices").addEventListener("change", pushNotifyPref);
+setInterval(() => { if (booted) loadAlerts(); }, 90000);
 if (KEY) { api("what=status", KEY).then(boot).catch(() => { gate.style.display = "flex"; }); } else { gate.style.display = "flex"; }
 </script>
 </body>
