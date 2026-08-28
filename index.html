@@ -58,7 +58,7 @@ aside h2{font-size:15px;margin-bottom:8px}
 table{border-collapse:collapse;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
 th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13.5px}
 th{background:var(--panel2);color:var(--ink2);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
-tr:hover td{background:var(--panel2)}
+tr:hover td{background:var(--pan2)}
 .tblwrap{overflow-x:auto;border-radius:8px}
 .stgsel{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:4px 6px;max-width:210px}
 .chip{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-size:12px;margin:1px 2px 1px 0;white-space:nowrap}
@@ -75,6 +75,8 @@ tr:hover td{background:var(--panel2)}
 .alert{border-top:1px solid var(--line);padding:7px 0;font-size:12.5px}
 .alert:first-of-type{border-top:none}
 .alert .when{color:var(--ink2);font-size:11px}
+#ppHeirForm input,#ppHeirForm select,#plLang,#plName,#settingsSide input{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:7px 8px}
+.mkt{width:90px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:5px 6px}
 #gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
 #gate .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:28px;max-width:380px;text-align:center}
 #gate input{width:100%;margin:14px 0;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink)}
@@ -111,7 +113,9 @@ tr:hover td{background:var(--panel2)}
   </div>
   <span id="stats">loading…</span>
   <div class="spacer"></div>
+  <button id="baseBtn" title="Switch base map">Satellite</button>
   <button id="bellBtn" title="Notifications">🔔<span id="bellN"></span></button>
+  <button id="settingsBtn" title="Settings">⚙</button>
   <button id="filtersBtn">Filters</button>
   <button id="noticesBtn">Court notices</button>
   <button id="refreshBtn" title="Reload data from the database">Refresh</button>
@@ -151,6 +155,14 @@ tr:hover td{background:var(--panel2)}
       <option value="5">5 or more</option>
       <option value="10">10 or more</option>
     </select></label>
+  <label>Score ≥ <input id="fScore" type="number" min="0" max="100" placeholder="0" style="width:70px"></label>
+  <label>Split family
+    <select id="fFrag">
+      <option value="">Any</option>
+      <option value="5">5+ sibling parcels</option>
+      <option value="10">10+ sibling parcels</option>
+      <option value="20">20+ sibling parcels</option>
+    </select></label>
   <button id="fClear">Clear</button>
   <span id="fcount"></span>
 </div>
@@ -158,6 +170,15 @@ tr:hover td{background:var(--panel2)}
 <main>
   <div id="map"></div>
   <aside id="side"><h2>Live court notices <span class="muted" id="ncount"></span></h2><div id="nlist"></div></aside>
+
+  <aside id="settingsSide">
+    <h2>Settings</h2>
+    <p class="muted" style="font-size:12px;margin-bottom:8px">Stored in the shared database — applies to the whole team.</p>
+    <label class="muted" style="display:block;font-size:12.5px;margin-top:8px">Google Maps API key <span class="muted">(enables in-app Street View)</span>
+      <input id="cfgGKey" type="password" placeholder="AIza…" style="width:100%;margin-top:4px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:7px 8px"></label>
+    <button id="cfgSave" style="margin-top:10px">Save settings</button>
+    <span id="cfgMsg" class="muted" style="margin-left:8px;font-size:12px"></span>
+  </aside>
 
   <aside id="alertsSide">
     <h2>Notifications</h2>
@@ -179,14 +200,50 @@ tr:hover td{background:var(--panel2)}
 
   <div class="oview" id="opsView">
     <h2>Operations — the working pipeline</h2>
-    <p class="sub">Every prospect, whatever its stage. Change a stage right here; it is journalled automatically. 📍 jumps to it on the map.</p>
+    <p class="sub">Every prospect, whatever its stage. Change a stage right here; it is journalled automatically. 📍 jumps to it on the map. Click a prospect's name to open its file — heirs, letters, documents.</p>
     <div id="opsBody"></div>
   </div>
 
   <div class="oview" id="salesView">
     <h2>Sales — deals and exits</h2>
-    <p class="sub">Prospects from valuation (stage 9) through exit (stage 15): the money book.</p>
+    <p class="sub">Prospects from valuation (stage 9) through exit (stage 15): the money book. Set the market rate per m² and the offer per deal — every save is journalled.</p>
     <div id="salesBody"></div>
+  </div>
+
+  <div class="oview" id="prospectPanel" style="z-index:12">
+    <button id="ppBack" style="margin-bottom:10px">← Back to Operations</button>
+    <h2 id="ppTitle"></h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start" id="ppGrid">
+      <div>
+        <div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px">
+          <h3 style="font-size:14px;margin-bottom:8px">Heirs & contacts <span class="muted" id="ppHeirN"></span></h3>
+          <div id="ppHeirs"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px" id="ppHeirForm">
+            <input placeholder="Name" id="hName"><input placeholder="Relation (e.g. grandson of owner)" id="hRel">
+            <input placeholder="Share (e.g. 1/12)" id="hShare"><input placeholder="Country" id="hCountry">
+            <input placeholder="Language (hr/de/en…)" id="hLang"><input placeholder="Phone or email" id="hContact">
+            <select id="hPoa"><option value="none">POA: none</option><option value="requested">POA: requested</option><option value="signed">POA: signed</option><option value="apostilled">POA: apostilled</option></select>
+            <select id="hConsent"><option value="unknown">Consent: unknown</option><option value="interested">Interested</option><option value="agreed">Agreed</option><option value="declined">Declined</option></select>
+          </div>
+          <button id="hAdd" style="margin-top:8px">+ Add heir</button><span id="hMsg" class="muted" style="margin-left:8px;font-size:12px"></span>
+        </div>
+        <div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:14px">
+          <h3 style="font-size:14px;margin-bottom:8px">First-contact letter (the pledge)</h3>
+          <select id="plLang"><option value="hr">Hrvatski</option><option value="en">English</option><option value="de">Deutsch</option><option value="it">Italiano</option></select>
+          <input placeholder="Heir's name (e.g. Ivan)" id="plName" style="width:160px">
+          <button id="plGen">Generate</button>
+          <textarea id="plOut" rows="9" style="width:100%;margin-top:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:8px;font-size:12.5px" placeholder="The letter appears here…"></textarea>
+          <button id="plCopy" style="margin-top:6px">Copy letter</button><span id="plMsg" class="muted" style="margin-left:8px;font-size:12px"></span>
+        </div>
+      </div>
+      <div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px">
+        <h3 style="font-size:14px;margin-bottom:8px">Documents <span class="muted" id="ppDocN"></span></h3>
+        <div id="ppDocs"></div>
+        <input type="file" id="docFile" style="margin-top:10px;color:var(--ink2)">
+        <button id="docUp" style="margin-top:6px">Upload to vault</button><span id="docMsg" class="muted" style="margin-left:8px;font-size:12px"></span>
+        <p class="muted" style="font-size:11.5px;margin-top:8px">Extracts, powers of attorney, pre-contracts. Private storage; links expire after an hour. 15 MB per file.</p>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -233,9 +290,37 @@ async function tryKey() {
 }
 document.getElementById("lockBtn").onclick = () => { try { localStorage.removeItem(LS); } catch (e) {} location.reload(); };
 
-let map, booted = false, searchMarker = null;
+let map, booted = false, searchMarker = null, satOn = false;
 let allParcels = { type: "FeatureCollection", features: [] };
 let opsData = [];
+let appConfig = {};
+document.getElementById("baseBtn").onclick = function () {
+  if (!map) return;
+  satOn = !satOn;
+  map.setLayoutProperty("esri", "visibility", satOn ? "visible" : "none");
+  map.setLayoutProperty("osm", "visibility", satOn ? "none" : "visible");
+  this.textContent = satOn ? "Streets" : "Satellite";
+  this.classList.toggle("on", satOn);
+};
+document.getElementById("settingsBtn").onclick = function () {
+  for (const [aid, bid] of [["side","noticesBtn"],["alertsSide","bellBtn"]]) {
+    document.getElementById(aid).classList.remove("open");
+    document.getElementById(bid).classList.remove("on");
+  }
+  const s = document.getElementById("settingsSide");
+  s.classList.toggle("open"); this.classList.toggle("on");
+  document.getElementById("cfgGKey").value = appConfig.google_maps_key || "";
+};
+document.getElementById("cfgSave").onclick = async function () {
+  const msg = document.getElementById("cfgMsg");
+  msg.textContent = "saving…";
+  try {
+    const v = document.getElementById("cfgGKey").value.trim();
+    await api(`what=config_set&k=google_maps_key&v=${encodeURIComponent(v)}`, KEY);
+    appConfig.google_maps_key = v;
+    msg.textContent = v ? "saved ✓ — Street View is now embedded in parcel popups" : "saved ✓ (key cleared)";
+  } catch (e) { msg.textContent = "failed: " + e.message; }
+};
 const STAGE_NAMES = {1:"Territory chosen",2:"Extract read",3:"Notice watch",4:"Site visit",5:"Family tree",6:"First contact",7:"Heir eligibility",8:"Title fixing",9:"Valuation",10:"Pre-contract",11:"Share purchases",12:"Contract & registration",13:"Tax",14:"Consolidation",15:"Exit / hold"};
 function stageColor(s) {
   if (s == null) return "#5c6a75";
@@ -260,6 +345,7 @@ function setView(v) {
   document.getElementById("opsView").classList.toggle("open", v === "ops");
   document.getElementById("salesView").classList.toggle("open", v === "sales");
   document.getElementById("researchView").classList.toggle("open", v === "research");
+  document.getElementById("prospectPanel").classList.remove("open");
   document.getElementById("legend").style.display = v === "map" ? "block" : "none";
   if (v === "ops") renderOps();
   if (v === "sales") renderSales();
@@ -281,8 +367,14 @@ async function boot() {
     container: "map",
     style: {
       version: 8,
-      sources: { osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors · Geocoding © Nominatim" } },
-      layers: [{ id: "osm", type: "raster", source: "osm" }]
+      sources: {
+        osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors · Imagery © Esri · Geocoding © Nominatim" },
+        esri: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }
+      },
+      layers: [
+        { id: "osm", type: "raster", source: "osm" },
+        { id: "esri", type: "raster", source: "esri", layout: { visibility: "none" } }
+      ]
     },
     center: [16.524, 43.557], zoom: 13.5
   });
@@ -296,6 +388,7 @@ async function loadData() {
     ]);
     opsData = ops || [];
     if (status.notify) notifyPref = status.notify;
+    appConfig = status.config || {};
     document.getElementById("stats").textContent =
       `${status.parcels ?? 0} parcels · tiles ${status.tiles_done ?? 0}/${status.tiles_total ?? 0} · ${opsData.length} prospects · ${status.notices ?? 0} notices`;
     for (const f of parcels.features) f.properties.color = stageColor(f.properties.stage);
@@ -360,11 +453,11 @@ document.getElementById("filtersBtn").onclick = function () {
   document.getElementById("filters").classList.toggle("open");
   this.classList.toggle("on");
 };
-for (const id of ["fKo", "fStage", "fOwn", "fZon"]) document.getElementById(id).addEventListener("change", applyFilters);
-for (const id of ["fMin", "fMax"]) document.getElementById(id).addEventListener("input", () => { clearTimeout(window.__ft); window.__ft = setTimeout(applyFilters, 400); });
+for (const id of ["fKo", "fStage", "fOwn", "fZon", "fFrag"]) document.getElementById(id).addEventListener("change", applyFilters);
+for (const id of ["fMin", "fMax", "fScore"]) document.getElementById(id).addEventListener("input", () => { clearTimeout(window.__ft); window.__ft = setTimeout(applyFilters, 400); });
 document.getElementById("fClear").onclick = () => {
-  for (const id of ["fKo", "fStage", "fOwn", "fZon"]) document.getElementById(id).value = "";
-  document.getElementById("fMin").value = ""; document.getElementById("fMax").value = "";
+  for (const id of ["fKo", "fStage", "fOwn", "fZon", "fFrag"]) document.getElementById(id).value = "";
+  for (const id of ["fMin", "fMax", "fScore"]) document.getElementById(id).value = "";
   applyFilters();
 };
 function buildKoOptions() {
@@ -399,6 +492,10 @@ function applyFilters() {
       if (own === "0" && n !== 0) return false;
       if (own !== "0" && n < parseInt(own)) return false;
     }
+    const sc = parseFloat(document.getElementById("fScore").value);
+    if (isFinite(sc) && !((p.score ?? 0) >= sc)) return false;
+    const fr = document.getElementById("fFrag").value;
+    if (fr && !((p.frag ?? 0) >= parseInt(fr))) return false;
     return true;
   });
   map.getSource("parcels").setData({ type: "FeatureCollection", features: feats });
@@ -434,11 +531,15 @@ function openParcelPopup(p, lngLat) {
   const g = `https://www.google.com/maps?q=${p.lat},${p.lon}`;
   const sv = `https://www.google.com/maps?layer=c&cbll=${p.lat},${p.lon}`;
   const hasProspect = p.prospect && p.prospect !== "null";
-  new maplibregl.Popup({ maxWidth: "300px" }).setLngLat(lngLat).setHTML(
+  const svEmbed = appConfig.google_maps_key
+    ? `<iframe style="width:100%;height:150px;border:0;border-radius:6px;margin-top:6px" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps/embed/v1/streetview?key=${encodeURIComponent(appConfig.google_maps_key)}&location=${p.lat},${p.lon}&fov=90"></iframe>` : "";
+  new maplibregl.Popup({ maxWidth: "320px" }).setLngLat(lngLat).setHTML(
     `<b>Parcel ${esc(p.parcel_no)}</b> — ${esc(p.ko || "")}<br>` +
     `${p.area_m2 ? fmtN(p.area_m2) + " m²" : ""}` +
+    `${p.score != null ? ` · score <b>${p.score}</b>` : ""}${p.frag > 1 ? ` · family of ${p.frag} split parcels` : ""}` +
     `${hasProspect ? "<br>Prospect: <b>" + esc(p.prospect) + "</b> (stage " + p.stage + ")" : "<br><span style='color:#A99F87'>Not researched yet</span>"}` +
     `<br>Owners recorded: ${p.owners_known ?? 0}${p.zoning ? " · zoning: " + esc(p.zoning) : ""}${p.read ? " · <span style='color:var(--good)'>extract read ✓</span>" : ""}` +
+    svEmbed +
     `<br><a href="${g}" target="_blank" rel="noopener">Google Maps</a> · <a href="${sv}" target="_blank" rel="noopener">Street View</a> · <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Land registry</a>` +
     (!hasProspect ? `<br><button class="add" onclick="djAdd('Parcel ${esc(p.parcel_no)}, ${esc(p.ko || "")}', ${p.lat}, ${p.lon}, this)">+ Add to Djedovina</button>` : "")
   ).addTo(map);
@@ -479,7 +580,7 @@ function renderOps() {
     <th>Prospect</th><th>Stage</th><th>Parcels</th><th class="num">Owners on title</th>
     <th>Tasks</th><th class="num">Spent / budget €</th><th>Last note</th><th></th>
   </tr></thead><tbody>` + opsData.map(o => `<tr>
-    <td><b>${esc(o.name)}</b>${o.address && o.address !== o.name ? `<br><span class="muted">${esc(o.address)}</span>` : ""}</td>
+    <td><b class="loc" style="cursor:pointer;text-decoration:underline dotted" title="Open the file: heirs, letters, documents" onclick="openProspect(${o.id})">${esc(o.name)}</b>${o.address && o.address !== o.name ? `<br><span class="muted">${esc(o.address)}</span>` : ""}<br><span class="muted">${o.heirs ?? 0} heir(s) · ${o.docs ?? 0} document(s)</span></td>
     <td>${stageSelect(o)}</td>
     <td>${parcelChips(o)}</td>
     <td class="num">${o.owners_count ?? "—"}</td>
@@ -500,22 +601,160 @@ function renderSales() {
   }
   const totArea = deals.reduce((s, o) => s + (o.parcels || []).reduce((a, p) => a + (+p.area_m2 || 0), 0), 0);
   const totSpent = deals.reduce((s, o) => s + (+o.spent || 0), 0);
+  const totOffer = deals.reduce((s, o) => s + (+o.offer_eur || 0), 0);
   el.innerHTML = `<div class="tblwrap"><table><thead><tr>
     <th>Deal</th><th>Stage</th><th>Parcels & area</th><th>Model</th>
+    <th class="num">Market €/m²</th><th class="num">Offer €</th>
     <th class="num">Spent €</th><th>Next step</th><th></th>
-  </tr></thead><tbody>` + deals.map(o => `<tr>
-    <td><b>${esc(o.name)}</b></td>
+  </tr></thead><tbody>` + deals.map(o => {
+    const area = (o.parcels || []).reduce((a, p) => a + (+p.area_m2 || 0), 0);
+    const hint = area && o.market_eur_m2 ? `<br><span class="muted">${fmtN(area)} m² × market = ${fmtN(area * o.market_eur_m2)} €</span>` : "";
+    return `<tr>
+    <td><b class="loc" style="cursor:pointer;text-decoration:underline dotted" title="Open the file: heirs, letters, documents" onclick="openProspect(${o.id})">${esc(o.name)}</b></td>
     <td>${o.stage}. ${STAGE_NAMES[o.stage] || ""}</td>
     <td>${parcelChips(o)}</td>
     <td>${esc(o.model || "undecided")}</td>
+    <td class="num"><input class="mkt" id="mk-${o.id}" type="number" min="0" step="1" value="${o.market_eur_m2 ?? ""}" placeholder="€/m²"></td>
+    <td class="num"><input class="mkt" id="of-${o.id}" type="number" min="0" step="100" value="${o.offer_eur ?? ""}" placeholder="€">
+      <button class="add" style="margin-left:4px;padding:4px 8px" onclick="djOffer(${o.id}, this)">Save</button>${hint}</td>
     <td class="num">${fmtN(o.spent)}</td>
     <td>${o.open_tasks ? `${o.open_tasks} task(s)${o.next_due ? " · " + esc(o.next_due) : ""}` : `<span class="muted">set the next task</span>`}</td>
     <td>${o.lat ? `<span class="loc" onclick="djLocate(${o.lat}, ${o.lon})" title="Show on the map">📍</span>` : ""}</td>
-  </tr>`).join("") + `</tbody><tfoot><tr>
+  </tr>`; }).join("") + `</tbody><tfoot><tr>
     <th>Total: ${deals.length} deal(s)</th><th></th><th class="num">${fmtN(totArea)} m²</th><th></th>
+    <th></th><th class="num">${fmtN(totOffer)}</th>
     <th class="num">${fmtN(totSpent)}</th><th></th><th></th>
   </tr></tfoot></table></div>`;
 }
+window.djOffer = async function (id, btn) {
+  const mk = document.getElementById("mk-" + id).value;
+  const of = document.getElementById("of-" + id).value;
+  btn.disabled = true; btn.textContent = "…";
+  try {
+    const d = await api(`what=set_offer&prospect=${id}&market=${encodeURIComponent(mk)}&offer=${encodeURIComponent(of)}`, KEY);
+    if (d.error) throw new Error(d.error);
+    btn.textContent = "✓";
+    const o = opsData.find(x => x.id === id);
+    if (o) { o.market_eur_m2 = mk ? +mk : null; o.offer_eur = of ? +of : null; }
+    setTimeout(() => { btn.disabled = false; btn.textContent = "Save"; renderSales(); }, 800);
+  } catch (e) { btn.disabled = false; btn.textContent = "Save"; alert("Save failed: " + e.message); }
+};
+
+/* ---------- prospect file: heirs, pledge letters, documents ---------- */
+let ppCur = null;
+window.openProspect = function (id) {
+  const o = opsData.find(x => x.id === id); if (!o) return;
+  ppCur = o;
+  for (const v of ["opsView", "salesView", "researchView"]) document.getElementById(v).classList.remove("open");
+  document.getElementById("prospectPanel").classList.add("open");
+  document.getElementById("ppTitle").textContent = o.name;
+  document.getElementById("plOut").value = "";
+  document.getElementById("plMsg").textContent = "";
+  document.getElementById("hMsg").textContent = "";
+  document.getElementById("docMsg").textContent = "";
+  loadHeirs(); loadDocs();
+};
+document.getElementById("ppBack").onclick = () => setView("ops");
+async function loadHeirs() {
+  const el = document.getElementById("ppHeirs");
+  el.innerHTML = `<p class="muted">Loading…</p>`;
+  try {
+    const heirs = await api(`what=heirs&prospect=${ppCur.id}`, KEY);
+    document.getElementById("ppHeirN").textContent = `(${heirs.length})`;
+    ppCur.__heirs = heirs;
+    el.innerHTML = heirs.length ? heirs.map(h =>
+      `<div class="notice"><b>${esc(h.name)}</b>${h.share ? ` · ${esc(h.share)}` : ""}${h.relation ? ` <span class="muted">— ${esc(h.relation)}</span>` : ""}<br>` +
+      `<span class="muted">${[h.country, h.language, h.phone, h.email].filter(Boolean).map(esc).join(" · ")}</span><br>` +
+      `<span class="chip">POA: ${esc(h.poa || "none")}</span> <span class="chip">${esc(h.consent || "unknown")}</span></div>`
+    ).join("") : `<p class="muted">No heirs recorded yet — add the first below.</p>`;
+  } catch (e) { el.innerHTML = `<p class="muted">Could not load heirs: ${esc(e.message)}</p>`; }
+}
+document.getElementById("hAdd").onclick = async function () {
+  const g = id => document.getElementById(id).value.trim();
+  const name = g("hName");
+  const msg = document.getElementById("hMsg");
+  if (!name) { msg.textContent = "name is required"; return; }
+  const contact = g("hContact");
+  this.disabled = true; msg.textContent = "saving…";
+  try {
+    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=heir_add`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prospect_id: ppCur.id, name, relation: g("hRel") || null, share: g("hShare") || null,
+        country: g("hCountry") || null, language: g("hLang") || null,
+        phone: contact && !contact.includes("@") ? contact : null,
+        email: contact.includes("@") ? contact : null,
+        poa: document.getElementById("hPoa").value, consent: document.getElementById("hConsent").value })
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    msg.textContent = "saved ✓";
+    for (const id of ["hName", "hRel", "hShare", "hCountry", "hLang", "hContact"]) document.getElementById(id).value = "";
+    document.getElementById("hPoa").value = "none"; document.getElementById("hConsent").value = "unknown";
+    loadHeirs(); loadData();
+  } catch (e) { msg.textContent = "failed: " + e.message; }
+  this.disabled = false;
+};
+const PLEDGE = {
+  hr: (heir, prop) => `Poštovani/a ${heir},\n\nobraćamo Vam se u vezi zemljišta "${prop}" koje je, prema javnim knjigama, još uvijek upisano na Vašu obitelj. Mi smo Djedovina — obiteljska tvrtka iz Klisa koja sređuje stare zemljišne knjige u splitskom kraju.\n\nNaše obećanje: ništa se ne događa bez Vašeg potpisa. Prvo o našem trošku provjeravamo stanje u zemljišnim knjigama i pripremimo Vam jasan pregled — tko je upisan, s kojim udjelom i što bi trebalo srediti. Vi odlučujete želite li prodati, zadržati ili samo urediti upis na svoje ime.\n\nAko želite razgovarati, javite se — na hrvatskom ili jeziku koji Vam je draži.\n\nSa štovanjem,\nDjedovina`,
+  en: (heir, prop) => `Dear ${heir},\n\nWe are writing about the land "${prop}", which the public land registry still records in your family's name. We are Djedovina, a family firm from Klis that settles old land-registry entries around Split.\n\nOur pledge: nothing happens without your signature. First, at our own cost, we check the land registry and prepare a clear summary for you — who is recorded, with what share, and what would need to be put in order. You then decide whether to sell, keep, or simply register the land properly in your own name.\n\nIf you would like to talk, write back in whichever language suits you.\n\nWith respect,\nDjedovina`,
+  de: (heir, prop) => `Sehr geehrte/r ${heir},\n\nwir schreiben Ihnen wegen des Grundstücks "${prop}", das im öffentlichen Grundbuch noch auf Ihre Familie eingetragen ist. Wir sind Djedovina, ein Familienunternehmen aus Klis, das alte Grundbucheinträge in der Region Split bereinigt.\n\nUnser Versprechen: Ohne Ihre Unterschrift geschieht nichts. Zuerst prüfen wir auf eigene Kosten das Grundbuch und erstellen für Sie eine klare Übersicht — wer eingetragen ist, mit welchem Anteil, und was zu ordnen wäre. Sie entscheiden dann, ob Sie verkaufen, behalten oder das Land einfach auf Ihren Namen eintragen lassen möchten.\n\nWenn Sie sprechen möchten, antworten Sie gern auf Deutsch.\n\nMit freundlichen Grüßen,\nDjedovina`,
+  it: (heir, prop) => `Gentile ${heir},\n\nLe scriviamo riguardo al terreno "${prop}", che il registro fondiario pubblico riporta ancora a nome della Sua famiglia. Siamo Djedovina, un'impresa familiare di Klis che sistema le vecchie iscrizioni tavolari nella zona di Spalato.\n\nIl nostro impegno: senza la Sua firma non accade nulla. Per prima cosa, a nostre spese, verifichiamo il registro fondiario e prepariamo per Lei un quadro chiaro — chi è iscritto, con quale quota, e cosa andrebbe sistemato. Sarà poi Lei a decidere se vendere, tenere, o semplicemente intestare il terreno a Suo nome.\n\nSe desidera parlarne, ci risponda pure in italiano.\n\nCordiali saluti,\nDjedovina`
+};
+document.getElementById("plGen").onclick = () => {
+  const lang = document.getElementById("plLang").value;
+  const heir = document.getElementById("plName").value.trim() || ((ppCur.__heirs || [])[0]?.name) || "…";
+  document.getElementById("plOut").value = PLEDGE[lang](heir, ppCur.name);
+  document.getElementById("plMsg").textContent = "";
+};
+document.getElementById("plCopy").onclick = async () => {
+  const t = document.getElementById("plOut").value;
+  const msg = document.getElementById("plMsg");
+  if (!t) { msg.textContent = "generate a letter first"; return; }
+  try { await navigator.clipboard.writeText(t); msg.textContent = "copied ✓ — journalled"; }
+  catch (e) { document.getElementById("plOut").select(); document.execCommand("copy"); msg.textContent = "copied ✓ — journalled"; }
+  const lang = document.getElementById("plLang").value;
+  const heir = document.getElementById("plName").value.trim() || ((ppCur.__heirs || [])[0]?.name) || "?";
+  try { await api(`what=journal_add&prospect=${ppCur.id}&text=${encodeURIComponent(`Pledge letter (${lang}) prepared for ${heir} — map app`)}`, KEY); } catch (e) {}
+};
+function fmtSize(b) { return b == null ? "" : b > 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.round(b / 1024) + " KB"; }
+async function loadDocs() {
+  const el = document.getElementById("ppDocs");
+  el.innerHTML = `<p class="muted">Loading…</p>`;
+  try {
+    const docs = await api(`what=docs&prospect=${ppCur.id}`, KEY);
+    document.getElementById("ppDocN").textContent = `(${docs.length})`;
+    el.innerHTML = docs.length ? docs.map(d =>
+      `<div class="notice">${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener"><b>${esc(d.file_name)}</b></a>` : `<b>${esc(d.file_name)}</b>`}` +
+      ` <span class="muted">${fmtSize(d.size_bytes)} · ${esc((d.uploaded_at || "").slice(0, 10))}</span></div>`
+    ).join("") : `<p class="muted">Vault is empty — upload the first extract or power of attorney below.</p>`;
+  } catch (e) { el.innerHTML = `<p class="muted">Could not load documents: ${esc(e.message)}</p>`; }
+}
+document.getElementById("docUp").onclick = function () {
+  const f = document.getElementById("docFile").files[0];
+  const msg = document.getElementById("docMsg");
+  if (!f) { msg.textContent = "choose a file first"; return; }
+  if (f.size > 15 * 1024 * 1024) { msg.textContent = "too large — 15 MB max"; return; }
+  const btn = this;
+  btn.disabled = true; msg.textContent = "uploading…";
+  const rd = new FileReader();
+  rd.onload = async () => {
+    try {
+      const b64 = String(rd.result).split(",")[1];
+      const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=doc_upload`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prospect_id: ppCur.id, file_name: f.name, content_type: f.type || "application/octet-stream", data_base64: b64 })
+      });
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      msg.textContent = "stored ✓";
+      document.getElementById("docFile").value = "";
+      loadDocs(); loadData();
+    } catch (e) { msg.textContent = "failed: " + e.message; }
+    btn.disabled = false;
+  };
+  rd.onerror = () => { msg.textContent = "could not read the file"; btn.disabled = false; };
+  rd.readAsDataURL(f);
+};
 
 /* ---------- research (extract-reading queue) ---------- */
 document.getElementById("rReload").onclick = loadWorklist;
@@ -523,6 +762,7 @@ document.getElementById("rKo").addEventListener("change", loadWorklist);
 async function loadWorklist() {
   const el = document.getElementById("researchBody");
   el.innerHTML = `<p class="muted">Loading the queue…</p>`;
+  // keep the KO chooser in sync with loaded data
   const rSel = document.getElementById("rKo");
   const cur = rSel.value;
   const kos = [...new Set(allParcels.features.map(f => f.properties.ko).filter(Boolean))].sort();
