@@ -264,6 +264,7 @@ tr:hover td{background:var(--panel2)}
   <div><i style="background:#E9E0C9"></i> Close & exit (14–15)</div>
   <div><i style="background:transparent;border:2px solid var(--terra);border-radius:50%"></i> Saved pin (parcel not loaded yet)</div>
   <div><i style="background:transparent;border:2px solid var(--sea);border-radius:50%"></i> Court notice on this parcel</div>
+  <div class="muted" style="margin-top:5px">Zoomed out: one dot per parcel — zoom in for boundaries</div>
 </div>
 
 <script>
@@ -461,21 +462,19 @@ async function boot() {
   });
   map.addControl(new maplibregl.NavigationControl());
   bindDraw();
+  map.on("moveend", () => { clearTimeout(vpTimer); vpTimer = setTimeout(loadViewportParcels, 300); });
   map.on("load", loadData);
 }
 async function loadData() {
   try {
-    const [status, parcels, notices, pins, ops, npins] = await Promise.all([
-      api("what=status", KEY), api("what=parcels", KEY), api("what=notices", KEY), api("what=pins", KEY), api("what=ops", KEY), api("what=notice_pins", KEY)
+    const [status, notices, pins, ops, npins] = await Promise.all([
+      api("what=status", KEY), api("what=notices", KEY), api("what=pins", KEY), api("what=ops", KEY), api("what=notice_pins", KEY)
     ]);
     opsData = ops || [];
     if (status.notify) notifyPref = status.notify;
     appConfig = status.config || {};
     document.getElementById("stats").textContent =
       `${status.parcels ?? 0} parcels · tiles ${status.tiles_done ?? 0}/${status.tiles_total ?? 0} · ${opsData.length} prospects · ${status.notices ?? 0} notices`;
-    for (const f of parcels.features) f.properties.color = stageColor(f.properties.stage);
-    allParcels = parcels;
-    buildKoOptions();
     const pinGeo = { type: "FeatureCollection", features: (pins || []).map(p => ({
       type: "Feature", geometry: { type: "Point", coordinates: [p.lon, p.lat] },
       properties: { name: p.name, stage: p.stage, address: p.address || "" }
@@ -525,6 +524,9 @@ async function loadData() {
       }
       applyFilters();
     }
+    loadDots();
+    lastVpKey = "";
+    loadViewportParcels();
     renderNotices(notices);
     loadAlerts();
     if (document.getElementById("opsView").classList.contains("open")) renderOps();
@@ -587,6 +589,57 @@ function applyFilters() {
   map.getSource("parcels").setData({ type: "FeatureCollection", features: feats });
   document.getElementById("fcount").textContent =
     feats.length === allParcels.features.length ? `${feats.length} parcels` : `${feats.length} of ${allParcels.features.length} parcels`;
+}
+
+/* ---------- parcel loading: dots overview + viewport polygons ----------
+   The territory holds ~100,000 parcels — far too many to ship as polygons in one
+   response. Zoomed out, every parcel is one stage-colored dot (a single compact
+   load); past POLY_ZOOM the full polygons for the visible area are fetched and
+   refreshed as the map moves. */
+const POLY_ZOOM = 14.6;
+let vpTimer = null, vpSeq = 0, lastVpKey = "";
+function stageColorExpr() {
+  return ["case",
+    ["<", ["get", "s"], 0], "#5c6a75",
+    ["<=", ["get", "s"], 4], "#7FB4C4",
+    ["==", ["get", "s"], 5], "#93A467",
+    ["<=", ["get", "s"], 7], "#D9B25E",
+    ["==", ["get", "s"], 8], "#D6845A",
+    ["<=", ["get", "s"], 13], "#8FBF7F",
+    "#E9E0C9"];
+}
+async function loadDots() {
+  try {
+    const d = await api("what=parcel_dots", KEY);
+    const geo = { type: "FeatureCollection", features: (d || []).map(a => ({
+      type: "Feature", geometry: { type: "Point", coordinates: [a[0], a[1]] }, properties: { s: a[2] } })) };
+    if (map.getSource("dotsrc")) { map.getSource("dotsrc").setData(geo); }
+    else {
+      map.addSource("dotsrc", { type: "geojson", data: geo });
+      map.addLayer({ id: "parcel-overview", type: "circle", source: "dotsrc", maxzoom: POLY_ZOOM,
+        paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 1.1, 12, 1.8, 14.5, 3.2],
+                 "circle-color": stageColorExpr(), "circle-opacity": 0.75 } },
+        map.getLayer("parcel-fill") ? "parcel-fill" : undefined);
+    }
+  } catch (e) { /* overview is best-effort */ }
+}
+async function loadViewportParcels() {
+  if (!map || map.getZoom() < POLY_ZOOM) return;
+  const b = map.getBounds();
+  const px = (b.getEast() - b.getWest()) * 0.25, py = (b.getNorth() - b.getSouth()) * 0.25;
+  const key = [b.getWest() - px, b.getSouth() - py, b.getEast() + px, b.getNorth() + py].map(v => v.toFixed(3)).join(",");
+  if (key === lastVpKey) return;
+  const seq = ++vpSeq;
+  const q = `what=parcels&minlon=${(b.getWest() - px).toFixed(5)}&minlat=${(b.getSouth() - py).toFixed(5)}&maxlon=${(b.getEast() + px).toFixed(5)}&maxlat=${(b.getNorth() + py).toFixed(5)}`;
+  try {
+    const d = await api(q, KEY);
+    if (seq !== vpSeq) return; // a newer viewport superseded this request
+    lastVpKey = key;
+    for (const f of d.features) f.properties.color = stageColor(f.properties.stage);
+    allParcels = d;
+    buildKoOptions();
+    applyFilters();
+  } catch (e) { /* keep whatever is already loaded */ }
 }
 
 /* ---------- notices ---------- */
