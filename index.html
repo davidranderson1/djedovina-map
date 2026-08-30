@@ -21,15 +21,15 @@ button,.btn{background:transparent;border:1px solid var(--line);color:var(--ink2
 button.on{background:var(--olive);color:var(--bg);border-color:var(--olive)}
 .vtabs{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px}
 .vtabs button{border:none;padding:6px 12px;border-radius:5px;font-weight:600}
-#searchWrap{position:relative;flex:1;min-width:200px;max-width:400px}
+#searchWrap{position:relative;flex:1;min-width:240px;max-width:640px}
 #searchIn{width:100%;padding:7px 34px 7px 10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink)}
 #searchGo{position:absolute;right:2px;top:2px;bottom:2px;border:none;background:transparent;color:var(--olive);cursor:pointer;padding:0 9px;font-size:15px}
-#searchRes{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;z-index:40;max-height:280px;overflow:auto;display:none;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+#searchRes{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;z-index:40;max-height:340px;overflow:auto;display:none;box-shadow:0 6px 18px rgba(0,0,0,.4)}
 #searchRes div.srrow{padding:8px 10px;border-top:1px solid var(--line);cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
 #searchRes div.srrow:first-child{border-top:none}
 #searchRes div.srrow:hover{background:var(--bg)}
 #searchRes .srmain{flex:1;min-width:0}
-#searchRes .srdet{display:block;font-size:11.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#searchRes .srdet{display:block;font-size:11.5px;color:var(--ink2);white-space:normal;line-height:1.35}
 #searchRes .srflag{flex:none;border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:12px;color:var(--ink2);background:transparent;cursor:pointer}
 #searchRes .srflag:hover{background:var(--olive);color:var(--bg);border-color:var(--olive)}
 #searchRes div.srnote{padding:8px 10px;font-size:12.5px}
@@ -341,6 +341,13 @@ function stageColor(s) {
 }
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function fmtN(n) { return n == null ? "—" : Math.round(n).toLocaleString(); }
+// Deep link into the state registry: resolves the parcel's possession sheet
+// server-side and redirects; falls back to the registry's search page.
+function regUrl(natRef) {
+  return natRef
+    ? `${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=registry&ref=${encodeURIComponent(natRef)}`
+    : "https://oss.uredjenazemlja.hr/public-services/search-cad-parcel";
+}
 
 /* ---------- views ---------- */
 const vtabs = document.getElementById("vtabs");
@@ -440,10 +447,13 @@ function bindDraw() {
 }
 
 /* ---------- boot & data ---------- */
+const VIEW_LS = "djedovina-map-view";
 async function boot() {
   gate.style.display = "none";
   if (booted) { return loadData(); }
   booted = true;
+  let savedView = null;
+  try { savedView = JSON.parse(localStorage.getItem(VIEW_LS) || "null"); } catch (e) {}
   map = new maplibregl.Map({
     container: "map",
     style: {
@@ -458,11 +468,18 @@ async function boot() {
         { id: "esri", type: "raster", source: "esri", layout: { visibility: "none" } }
       ]
     },
-    center: [16.524, 43.557], zoom: 13.5
+    center: (savedView && isFinite(savedView.lng) && isFinite(savedView.lat)) ? [savedView.lng, savedView.lat] : [16.524, 43.557],
+    zoom: (savedView && isFinite(savedView.zoom)) ? savedView.zoom : 13.5
   });
   map.addControl(new maplibregl.NavigationControl());
   bindDraw();
-  map.on("moveend", () => { clearTimeout(vpTimer); vpTimer = setTimeout(loadViewportParcels, 300); });
+  map.on("moveend", () => {
+    try {
+      const c = map.getCenter();
+      localStorage.setItem(VIEW_LS, JSON.stringify({ lng: +c.lng.toFixed(5), lat: +c.lat.toFixed(5), zoom: +map.getZoom().toFixed(2) }));
+    } catch (e) {}
+    clearTimeout(vpTimer); vpTimer = setTimeout(loadViewportParcels, 300);
+  });
   map.on("load", loadData);
 }
 async function loadData() {
@@ -679,7 +696,7 @@ function openParcelPopup(p, lngLat) {
     `${hasProspect ? "<br>Prospect: <b>" + esc(p.prospect) + "</b> (stage " + p.stage + ")" : "<br><span style='color:#A99F87'>Not researched yet</span>"}` +
     `<br>Owners recorded: ${p.owners_known ?? 0}${p.zoning ? " · zoning: " + esc(p.zoning) : ""}${p.read ? " · <span style='color:var(--good)'>extract read ✓</span>" : ""}` +
     svEmbed +
-    `<br><a href="${g}" target="_blank" rel="noopener">Google Maps</a> · <a href="${sv}" target="_blank" rel="noopener">Street View</a> · <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Land registry</a>` +
+    `<br><a href="${g}" target="_blank" rel="noopener">Google Maps</a> · <a href="${sv}" target="_blank" rel="noopener">Street View</a> · <a href="${esc(regUrl(p.nat_ref))}" target="_blank" rel="noopener" title="Opens this parcel's possession sheet in the state registry">Registry: this parcel</a>` +
     (!hasProspect ? `<br><button class="add" onclick="djAdd('Parcel ${esc(p.parcel_no)}, ${esc(p.ko || "")}', ${p.lat}, ${p.lon}, this)">+ Add to Djedovina</button>` : "")
   ).addTo(map);
 }
@@ -914,7 +931,7 @@ async function loadWorklist() {
       <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
         <b>Parcel ${esc(w.parcel_no)}</b><span class="muted">${esc(w.ko || "")} · ${fmtN(w.area_m2)} m²${w.prospect ? " · prospect: " + esc(w.prospect) : ""}</span>
         <span class="spacer" style="flex:1"></span>
-        <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Open land registry</a>
+        <a href="${esc(regUrl(w.nat_ref))}" target="_blank" rel="noopener">Registry: this parcel</a>
         <a href="https://ispu.mgipu.hr/" target="_blank" rel="noopener">Planning (ISPU)</a>
         <span class="loc" onclick="djLocate(${w.lat}, ${w.lon})">📍</span>
       </div>
@@ -1049,7 +1066,7 @@ async function pickResult(it) {
     } else {
       inner += `<br><span class="muted">Parcel not loaded here yet — it can still be saved as a pin.</span>`;
     }
-    inner += `<br><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener">Google Maps</a> · <a href="https://www.google.com/maps?layer=c&cbll=${lat},${lon}" target="_blank" rel="noopener">Street View</a> · <a href="https://oss.uredjenazemlja.hr/" target="_blank" rel="noopener">Land registry</a>`;
+    inner += `<br><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener">Google Maps</a> · <a href="https://www.google.com/maps?layer=c&cbll=${lat},${lon}" target="_blank" rel="noopener">Street View</a> · <a href="${esc(regUrl(m && m.nat_ref))}" target="_blank" rel="noopener">${m ? "Registry: this parcel" : "Land registry"}</a>`;
     if (!m || !m.prospect) {
       inner += `<br><button class="add" onclick="djAdd('${esc(label).replace(/'/g, "\\'")}', ${lat}, ${lon}, this)">+ Add to Djedovina</button>`;
     }
