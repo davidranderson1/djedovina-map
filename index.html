@@ -7,6 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🫒</text></svg>">
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{--bg:#141F26;--panel:#1C2A33;--panel2:#17242C;--ink:#E9E0C9;--ink2:#A99F87;--line:#31434E;--olive:#93A467;--terra:#D6845A;--sea:#7FB4C4;--good:#8FBF7F;--warn:#D9B25E;--crit:#E08A6D}
 *{box-sizing:border-box;margin:0}
@@ -97,7 +98,9 @@ tr:hover td{background:var(--panel2)}
 <body>
 <div id="gate"><div class="card">
   <div class="brand" style="font-size:26px">Djedovina <span>· Karta</span></div>
-  <p class="muted" style="margin-top:8px">Enter the team access key to open the property map.</p>
+  <p class="muted" style="margin-top:8px">Sign in with your team Google account to open the property map.</p>
+  <button class="go" id="gGo" style="width:100%">Sign in with Google</button>
+  <div class="muted" style="margin-top:12px;font-size:12px">— or use the team access key —</div>
   <input id="keyIn" type="password" placeholder="access key" autocomplete="off">
   <button class="go" id="keyGo">Open the map</button>
   <div class="err" id="keyErr"></div>
@@ -126,7 +129,7 @@ tr:hover td{background:var(--panel2)}
   <button id="filtersBtn">Filters</button>
   <button id="noticesBtn">Court notices</button>
   <button id="refreshBtn" title="Reload data from the database">Refresh</button>
-  <button id="lockBtn" title="Forget the access key on this device">Lock</button>
+  <button id="lockBtn" title="Sign out / forget the access key on this device">Lock</button>
 </header>
 
 <div id="filters">
@@ -285,13 +288,26 @@ const ENDPOINT = "https://zoojmmcdnyciadzktqnx.supabase.co/functions/v1/map-data
 const LS = "djedovina-map-key";
 let KEY = null; try { KEY = localStorage.getItem(LS); } catch (e) {}
 
+/* ---------- per-user sign-in (Google via Supabase Auth) ---------- */
+const SUPA = window.supabase.createClient(
+  "https://zoojmmcdnyciadzktqnx.supabase.co",
+  "sb_publishable_WBg0HcY2C_vj8JYfxa4wDQ_siiYMRGt"
+);
+let AUTH_TOKEN = null;
+SUPA.auth.onAuthStateChange((_ev, s) => { AUTH_TOKEN = s?.access_token ?? null; });
+function authHeaders(extra) {
+  const h = Object.assign({}, extra || {});
+  if (AUTH_TOKEN) h.authorization = "Bearer " + AUTH_TOKEN;
+  return h;
+}
+
 const gate = document.getElementById("gate");
 const keyErr = document.getElementById("keyErr");
 document.getElementById("keyGo").onclick = tryKey;
 document.getElementById("keyIn").addEventListener("keydown", e => { if (e.key === "Enter") tryKey(); });
 
 async function api(qs, key) {
-  const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key)}&${qs}`);
+  const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key ?? "")}&${qs}`, { headers: authHeaders() });
   if (r.status === 401) throw new Error("unauthorized");
   if (!r.ok) throw new Error("server " + r.status);
   return r.json();
@@ -309,7 +325,18 @@ async function tryKey() {
     keyErr.textContent = e.message === "unauthorized" ? "That key is not right." : "Could not reach the database: " + e.message;
   }
 }
-document.getElementById("lockBtn").onclick = () => { try { localStorage.removeItem(LS); } catch (e) {} location.reload(); };
+document.getElementById("lockBtn").onclick = () => {
+  try { localStorage.removeItem(LS); } catch (e) {}
+  SUPA.auth.signOut().catch(() => {}).finally(() => location.reload());
+};
+document.getElementById("gGo").onclick = async () => {
+  keyErr.textContent = "sending you to Google…";
+  const { error } = await SUPA.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: location.origin + location.pathname },
+  });
+  if (error) keyErr.textContent = "Google sign-in is not switched on yet — use the team key. (" + error.message + ")";
+};
 
 let map, booted = false, searchMarker = null, satOn = false;
 let allParcels = { type: "FeatureCollection", features: [] };
@@ -448,7 +475,7 @@ function bindDraw() {
     if (label === null) return;
     try {
       const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=add_area`, {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST", headers: authHeaders({ "content-type": "application/json" }),
         body: JSON.stringify({ label: label || def, parcel_ids: [...seen.keys()] })
       });
       const d = await r.json();
@@ -878,7 +905,7 @@ window.djPersonStatus = async function (id, sel) {
   sel.disabled = true;
   try {
     const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=person_set`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, status: sel.value })
+      method: "POST", headers: authHeaders({ "content-type": "application/json" }), body: JSON.stringify({ id, status: sel.value })
     });
     const d = await r.json(); if (d.error) throw new Error(d.error);
   } catch (e) { alert("Could not save the status: " + e.message); }
@@ -888,7 +915,7 @@ window.djLink = async function (entryId, personId, btn) {
   btn.disabled = true; btn.textContent = "linking…";
   try {
     const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=stake_link`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ entry_id: entryId, person_id: personId })
+      method: "POST", headers: authHeaders({ "content-type": "application/json" }), body: JSON.stringify({ entry_id: entryId, person_id: personId })
     });
     const d = await r.json(); if (d.error) throw new Error(d.error);
   } catch (e) { alert("Could not link: " + e.message); }
@@ -902,7 +929,7 @@ document.getElementById("lhAdd").onclick = async function () {
   this.disabled = true; msg.textContent = "saving…";
   try {
     const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=ledger_add`, {
-      method: "POST", headers: { "content-type": "application/json" },
+      method: "POST", headers: authHeaders({ "content-type": "application/json" }),
       body: JSON.stringify({ prospect_id: ppCur.id, unit_no: g("lhUnit") || null, name,
         share: g("lhShare") || null, address: g("lhAddr") || null, source: document.getElementById("lhSource").value })
     });
@@ -937,7 +964,7 @@ document.getElementById("hAdd").onclick = async function () {
   this.disabled = true; msg.textContent = "saving…";
   try {
     const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=heir_add`, {
-      method: "POST", headers: { "content-type": "application/json" },
+      method: "POST", headers: authHeaders({ "content-type": "application/json" }),
       body: JSON.stringify({ prospect_id: ppCur.id, name, relation: g("hRel") || null, share: g("hShare") || null,
         country: g("hCountry") || null, language: g("hLang") || null,
         phone: contact && !contact.includes("@") ? contact : null,
@@ -1000,7 +1027,7 @@ document.getElementById("docUp").onclick = function () {
     try {
       const b64 = String(rd.result).split(",")[1];
       const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=doc_upload`, {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST", headers: authHeaders({ "content-type": "application/json" }),
         body: JSON.stringify({ prospect_id: ppCur.id, file_name: f.name, content_type: f.type || "application/octet-stream", data_base64: b64 })
       });
       const d = await r.json();
@@ -1065,7 +1092,7 @@ window.djSaveExtract = async function (pid, btn) {
   btn.disabled = true; btn.textContent = "Saving…";
   try {
     const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=save_extract`, {
-      method: "POST", headers: { "content-type": "application/json" },
+      method: "POST", headers: authHeaders({ "content-type": "application/json" }),
       body: JSON.stringify({ parcel_id: pid, unit_no: g("wu").value, plomba: g("wp").checked,
         encumbrances: g("we").value, zoning: g("wz").value || null, owners })
     });
@@ -1252,7 +1279,24 @@ async function pushNotifyPref() {
 document.getElementById("swOn").addEventListener("change", pushNotifyPref);
 document.getElementById("swNotices").addEventListener("change", pushNotifyPref);
 setInterval(() => { if (booted) loadAlerts(); }, 90000);
-if (KEY) { api("what=status", KEY).then(boot).catch(() => { gate.style.display = "flex"; }); } else { gate.style.display = "flex"; }
+(async () => {
+  if (KEY) {
+    try { await api("what=status", KEY); boot(); return; } catch (e) { /* fall through to sign-in */ }
+  }
+  try {
+    const { data } = await SUPA.auth.getSession();
+    const session = data?.session;
+    if (session) {
+      AUTH_TOKEN = session.access_token;
+      try { await api("what=status", ""); KEY = ""; boot(); return; }
+      catch (e) {
+        keyErr.textContent = (session.user?.email || "This account") +
+          " is signed in but not on the team list — ask David to add it.";
+      }
+    }
+  } catch (e) { /* no session */ }
+  gate.style.display = "flex";
+})();
 </script>
 </body>
 </html>
