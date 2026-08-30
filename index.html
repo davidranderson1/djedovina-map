@@ -221,6 +221,19 @@ tr:hover td{background:var(--panel2)}
     <button id="ppBack" style="margin-bottom:10px">← Back to Operations</button>
     <h2 id="ppTitle"></h2>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start" id="ppGrid">
+      <div class="card" style="grid-column:1/-1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px">
+        <h3 style="font-size:14px;margin-bottom:8px">Share ledger — who owns what <span class="muted" id="ppLedN"></span></h3>
+        <div id="ppLedger"></div>
+        <div style="display:grid;grid-template-columns:110px 1fr 130px 1fr 170px;gap:6px;margin-top:12px">
+          <input placeholder="Folio no." id="lhUnit" title="Land-registry folio (zk. uložak) number">
+          <input placeholder="Holder's name, exactly as the registry writes it" id="lhName">
+          <input placeholder="Share (e.g. 3/48)" id="lhShare">
+          <input placeholder="Address as written (may be historic)" id="lhAddr">
+          <select id="lhSource"><option value="lr_extract">Source: LR extract</option><option value="cadastre">Source: cadastre</option><option value="court_notice">Source: court notice</option><option value="field">Source: field / family</option><option value="manual">Source: manual</option></select>
+        </div>
+        <button id="lhAdd" style="margin-top:8px">+ Add holder</button><span id="lhMsg" class="muted" style="margin-left:8px;font-size:12px"></span>
+        <p class="muted" style="font-size:11.5px;margin-top:8px">One row per registered holder, spelled exactly as the folio spells them. The bar shows how much of the folio is known, contacted, and agreed — the buying trigger is agreed = 100%. Rows are matched to real people automatically when the name is unambiguous; otherwise link a suggestion below the row.</p>
+      </div>
       <div>
         <div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px">
           <h3 style="font-size:14px;margin-bottom:8px">Heirs & contacts <span class="muted" id="ppHeirN"></span></h3>
@@ -808,9 +821,99 @@ window.openProspect = function (id) {
   document.getElementById("plMsg").textContent = "";
   document.getElementById("hMsg").textContent = "";
   document.getElementById("docMsg").textContent = "";
-  loadHeirs(); loadDocs();
+  document.getElementById("lhMsg").textContent = "";
+  loadLedger(); loadHeirs(); loadDocs();
 };
 document.getElementById("ppBack").onclick = () => setView("ops");
+
+/* ---------- share ledger: per-folio ownership, completeness, person matching ---------- */
+const PERSON_STATUSES = ["unknown", "tracing", "located", "contacted", "responded", "agreed", "declined", "deceased"];
+function pctL(x) { return Math.round((x || 0) * 1000) / 10; }
+function ledgerRow(en) {
+  const flags = [
+    en.deceased ? `<span class="chip" style="color:var(--crit)">† likely deceased</span>` : "",
+    en.no_oib ? `<span class="chip">no OIB</span>` : "",
+    en.abroad ? `<span class="chip">abroad</span>` : ""
+  ].filter(Boolean).join(" ");
+  const shr = en.share_frac != null ? ` · <b>${pctL(en.share_frac)}%</b>` : "";
+  let person;
+  if (en.person) {
+    person = `<select onchange="djPersonStatus(${en.person.id}, this)" style="font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 4px">` +
+      PERSON_STATUSES.map(s => `<option value="${s}"${s === en.person.status ? " selected" : ""}>${s}</option>`).join("") + `</select>` +
+      ([en.person.phone, en.person.email].filter(Boolean).length ? ` <span class="muted">${[en.person.phone, en.person.email].filter(Boolean).map(esc).join(" · ")}</span>` : "");
+  } else if (en.suggest && en.suggest.length) {
+    person = `<span class="muted" style="font-size:12px">same person?</span> ` +
+      en.suggest.map(s => `<button onclick="djLink(${en.entry_id}, ${s.id}, this)" style="font-size:11.5px">link: ${esc(s.name)} (${Math.round((s.sim || 0) * 100)}%)</button>`).join(" ");
+  } else {
+    person = `<span class="muted" style="font-size:12px">not yet linked to a person</span>`;
+  }
+  return `<div class="notice"><b>${esc(en.name)}</b>${en.share_text ? ` · ${esc(en.share_text)}` : ""}${shr} <span class="chip">${esc(en.source || "?")}</span>${flags ? " " + flags : ""}<br>` +
+    (en.address ? `<span class="muted">${esc(en.address)}</span><br>` : "") + person + `</div>`;
+}
+async function loadLedger() {
+  const el = document.getElementById("ppLedger");
+  el.innerHTML = `<p class="muted">Loading…</p>`;
+  try {
+    const d = await api(`what=ledger&prospect=${ppCur.id}`, KEY);
+    const folios = d.folios || [];
+    document.getElementById("ppLedN").textContent = folios.length ? `(${folios.length} folio${folios.length > 1 ? "s" : ""})` : "";
+    if (folios.length && !document.getElementById("lhUnit").value) document.getElementById("lhUnit").value = folios[0].unit_no || "";
+    if (!folios.length) { el.innerHTML = `<p class="muted">No land-registry folio recorded yet — add the first holder below and the folio is created automatically.</p>`; return; }
+    el.innerHTML = folios.map(f => {
+      const known = Math.min(1, f.known || 0), contacted = Math.min(known, f.contacted || 0), agreed = Math.min(contacted, f.agreed || 0);
+      const segs = [[agreed, "var(--good)"], [contacted - agreed, "var(--warn)"], [known - contacted, "var(--sea)"], [1 - known, "#5c6a75"]];
+      const bar = `<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin:8px 0 3px">` +
+        segs.map(([w, c]) => w > 0.0005 ? `<i style="flex:${w};background:${c}"></i>` : "").join("") + `</div>` +
+        `<div class="muted" style="font-size:11.5px;margin-bottom:4px">known ${pctL(known)}% · contacted ${pctL(contacted)}% · agreed ${pctL(agreed)}%` +
+        (known < 0.999 ? ` · <b style="color:var(--terra)">missing ${pctL(1 - known)}%</b>` : agreed > 0.999 ? ` · <b style="color:var(--good)">ready to buy ✓</b>` : ` · all holders known ✓`) + `</div>`;
+      return `<div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:10px">` +
+        `<b>Folio ${esc(f.unit_no || "?")}</b> <span class="muted">· k.o. ${esc(f.ko || "?")}${f.parcels && f.parcels.length ? ` · parcel ${f.parcels.map(esc).join(", ")}` : ""}</span>` +
+        (f.plomba ? ` <span class="chip" style="color:var(--crit)">⚠ plomba</span>` : "") +
+        (f.read_at ? ` <span class="muted" style="font-size:11px">extract read ${esc(String(f.read_at).slice(0, 10))}</span>` : "") +
+        bar + ((f.entries || []).map(ledgerRow).join("") || `<p class="muted" style="margin-top:6px">No holders recorded on this folio yet.</p>`) + `</div>`;
+    }).join("");
+  } catch (e) { el.innerHTML = `<p class="muted">Could not load the ledger: ${esc(e.message)}</p>`; }
+}
+window.djPersonStatus = async function (id, sel) {
+  sel.disabled = true;
+  try {
+    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=person_set`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, status: sel.value })
+    });
+    const d = await r.json(); if (d.error) throw new Error(d.error);
+  } catch (e) { alert("Could not save the status: " + e.message); }
+  loadLedger();
+};
+window.djLink = async function (entryId, personId, btn) {
+  btn.disabled = true; btn.textContent = "linking…";
+  try {
+    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=stake_link`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ entry_id: entryId, person_id: personId })
+    });
+    const d = await r.json(); if (d.error) throw new Error(d.error);
+  } catch (e) { alert("Could not link: " + e.message); }
+  loadLedger();
+};
+document.getElementById("lhAdd").onclick = async function () {
+  const g = id => document.getElementById(id).value.trim();
+  const msg = document.getElementById("lhMsg");
+  const name = g("lhName");
+  if (!name) { msg.textContent = "the holder's name is required"; return; }
+  this.disabled = true; msg.textContent = "saving…";
+  try {
+    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=ledger_add`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prospect_id: ppCur.id, unit_no: g("lhUnit") || null, name,
+        share: g("lhShare") || null, address: g("lhAddr") || null, source: document.getElementById("lhSource").value })
+    });
+    const d = await r.json(); if (d.error) throw new Error(d.error);
+    msg.textContent = "saved ✓";
+    for (const id of ["lhName", "lhShare", "lhAddr"]) document.getElementById(id).value = "";
+    loadLedger();
+  } catch (e) { msg.textContent = "failed: " + e.message; }
+  this.disabled = false;
+};
+
 async function loadHeirs() {
   const el = document.getElementById("ppHeirs");
   el.innerHTML = `<p class="muted">Loading…</p>`;
