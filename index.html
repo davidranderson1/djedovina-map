@@ -112,7 +112,7 @@ tr:hover td{background:var(--panel2)}
     <button data-v="sales">Sales</button>
   </nav>
   <div id="searchWrap">
-    <input id="searchIn" placeholder="Search address, building, or business (e.g. Bel Étage, Split)…" autocomplete="off">
+    <input id="searchIn" placeholder="Search exact address (e.g. Ivankova 33, Stobreč), building, or business…" autocomplete="off">
     <button id="searchGo" title="Search">⌕</button>
     <div id="searchRes"></div>
   </div>
@@ -460,7 +460,7 @@ async function boot() {
       version: 8,
       glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
       sources: {
-        osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors · Imagery © Esri · Geocoding © Nominatim" },
+        osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, attribution: "© OpenStreetMap contributors · Imagery © Esri · Geocoding © Nominatim & DGU" },
         esri: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }
       },
       layers: [
@@ -975,7 +975,7 @@ window.djSaveExtract = async function (pid, btn) {
   } catch (e) { btn.disabled = false; btn.textContent = "Failed — try again (" + e.message + ")"; }
 };
 
-/* ---------- place search (Photon fuzzy names + Nominatim addresses) ---------- */
+/* ---------- place search (state address register + Photon + Nominatim) ---------- */
 const sIn = document.getElementById("searchIn");
 const sRes = document.getElementById("searchRes");
 let sTimer = null, sSeq = 0;
@@ -999,9 +999,17 @@ async function doSearch() {
   const seq = ++sSeq;
   sRes.style.display = "block";
   sRes.innerHTML = `<div class="srnote muted">Searching…</div>`;
-  // Photon: fuzzy, finds named buildings/businesses ("Belatage" → Bel Étage).
-  // Nominatim: exact addresses. Both free OSM services, queried together.
+  // Three sources, best first: the STATE ADDRESS REGISTER (exact house numbers with
+  // the parcel under each address — authoritative), then Photon (fuzzy names for
+  // buildings/businesses, "Belatage" → Bel Étage), then Nominatim (OSM addresses).
   const c = map.getCenter();
+  const pAddr = api(`what=addr&q=${encodeURIComponent(q)}`, KEY)
+    .then(items => (items || []).map(a => ({
+      label: a.address,
+      detail: ["exact address", a.parcel_no ? "parcel " + a.parcel_no + (a.ko ? " (k.o. " + a.ko + ")" : "") : null].filter(Boolean).join(" · "),
+      icon: "🏠",
+      lat: a.lat, lon: a.lon
+    }))).catch(() => []);
   const pPhoton = fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=${c.lat.toFixed(4)}&lon=${c.lng.toFixed(4)}&bbox=16.00,43.30,17.05,43.80`)
     .then(r => r.json())
     .then(d => (d.features || []).map(f => ({
@@ -1021,11 +1029,12 @@ async function doSearch() {
       icon: srIcon(it.class, it.type),
       lat: parseFloat(it.lat), lon: parseFloat(it.lon)
     }))).catch(() => []);
-  const [ph, nm] = await Promise.all([pPhoton, pNomi]);
+  const [ad, ph, nm] = await Promise.all([pAddr, pPhoton, pNomi]);
   if (seq !== sSeq) return; // a newer search superseded this one
-  // merge: named places first, then addresses; drop near-duplicates (~60 m)
+  // merge: exact register addresses first, then named places, then OSM addresses;
+  // drop near-duplicates (~60 m)
   const results = [];
-  for (const r of [...ph, ...nm]) {
+  for (const r of [...ad, ...ph, ...nm]) {
     if (!isFinite(r.lat) || !isFinite(r.lon)) continue;
     if (results.some(x => Math.abs(x.lat - r.lat) < 0.0006 && Math.abs(x.lon - r.lon) < 0.0008)) continue;
     results.push(r);
