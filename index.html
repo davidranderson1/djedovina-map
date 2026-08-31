@@ -211,9 +211,9 @@ tr:hover td{background:var(--panel2)}
 
   <div class="oview" id="peopleView">
     <h2>People — everyone the registries name <span class="muted" id="peopleN"></span></h2>
-    <p class="sub">Every enrolled holder gathered from the cadastre and your extracts, one row per real person, biggest holdings first. "Area held" is their share of every folio they sit on, summed. Click a name to open their folios and parcels; ⚑ flags a parcel straight into the pipeline.</p>
+    <p class="sub">Every enrolled holder gathered from the cadastre and your extracts, one row per real person, biggest holdings first. "Area held" is their share of every folio they sit on, summed. Search by name, address, or <b>parcel number</b> (e.g. 1924/4 — pick the municipality too, since numbers repeat across k.o.). Click a name to open their folios and parcels; ⚑ flags a parcel straight into the pipeline.</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px" id="peopleBar">
-      <input id="pq" placeholder="Name or address…" style="min-width:260px">
+      <input id="pq" placeholder="Name, address, or parcel no. (e.g. 1924/4)…" style="min-width:260px">
       <select id="pko"><option value="">All municipalities</option></select>
       <select id="pst"><option value="">Any status</option><option value="unknown">unknown</option><option value="tracing">tracing</option><option value="located">located</option><option value="contacted">contacted</option><option value="responded">responded</option><option value="agreed">agreed</option><option value="declined">declined</option><option value="deceased">deceased</option></select>
       <label class="muted" style="display:flex;gap:5px;align-items:center;font-size:13px"><input type="checkbox" id="pfam" checked> families only (hide state, city, companies)</label>
