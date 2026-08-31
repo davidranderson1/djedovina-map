@@ -81,7 +81,7 @@ tr:hover td{background:var(--panel2)}
 .alert{border-top:1px solid var(--line);padding:7px 0;font-size:12.5px}
 .alert:first-of-type{border-top:none}
 .alert .when{color:var(--ink2);font-size:11px}
-#ppHeirForm input,#ppHeirForm select,#plLang,#plName,#settingsSide input{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:7px 8px}
+#ppHeirForm input,#ppHeirForm select,#plLang,#plName,#settingsSide input,#peopleBar input,#peopleBar select,#lhUnit,#lhName,#lhShare,#lhAddr,#lhSource{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:7px 8px}
 .mkt{width:90px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:5px 6px}
 #gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
 #gate .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:28px;max-width:380px;text-align:center}
@@ -111,6 +111,7 @@ tr:hover td{background:var(--panel2)}
   <nav class="vtabs" id="vtabs">
     <button data-v="map" class="on">Map</button>
     <button data-v="research">Research</button>
+    <button data-v="people">People</button>
     <button data-v="ops">Operations</button>
     <button data-v="sales">Sales</button>
   </nav>
@@ -206,6 +207,19 @@ tr:hover td{background:var(--panel2)}
       <button id="rReload">Reload queue</button>
     </div>
     <div id="researchBody"></div>
+  </div>
+
+  <div class="oview" id="peopleView">
+    <h2>People — everyone the registries name <span class="muted" id="peopleN"></span></h2>
+    <p class="sub">Every enrolled holder gathered from the cadastre and your extracts, one row per real person, biggest holdings first. "Area held" is their share of every folio they sit on, summed. Click a name to open their folios and parcels; ⚑ flags a parcel straight into the pipeline.</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px" id="peopleBar">
+      <input id="pq" placeholder="Name or address…" style="min-width:260px">
+      <select id="pko"><option value="">All municipalities</option></select>
+      <select id="pst"><option value="">Any status</option><option value="unknown">unknown</option><option value="tracing">tracing</option><option value="located">located</option><option value="contacted">contacted</option><option value="responded">responded</option><option value="agreed">agreed</option><option value="declined">declined</option><option value="deceased">deceased</option></select>
+      <label class="muted" style="display:flex;gap:5px;align-items:center;font-size:13px"><input type="checkbox" id="pfam" checked> families only (hide state, city, companies)</label>
+      <button id="pGo">Search</button>
+    </div>
+    <div id="peopleBody"></div>
   </div>
 
   <div class="oview" id="opsView">
@@ -400,11 +414,13 @@ function setView(v) {
   document.getElementById("opsView").classList.toggle("open", v === "ops");
   document.getElementById("salesView").classList.toggle("open", v === "sales");
   document.getElementById("researchView").classList.toggle("open", v === "research");
+  document.getElementById("peopleView").classList.toggle("open", v === "people");
   document.getElementById("prospectPanel").classList.remove("open");
   document.getElementById("legend").style.display = v === "map" ? "block" : "none";
   if (v === "ops") renderOps();
   if (v === "sales") renderSales();
   if (v === "research") loadWorklist();
+  if (v === "people") loadPeople();
 }
 window.djLocate = function (lat, lon) {
   setView("map");
@@ -531,7 +547,8 @@ async function loadData() {
     if (status.notify) notifyPref = status.notify;
     appConfig = status.config || {};
     document.getElementById("stats").textContent =
-      `${status.parcels ?? 0} parcels · tiles ${status.tiles_done ?? 0}/${status.tiles_total ?? 0} · ${opsData.length} prospects · ${status.notices ?? 0} notices`;
+      `${status.parcels ?? 0} parcels · owners scanned ${status.owners_done ?? 0}/${status.owners_total ?? 0} · ${status.persons ?? 0} people · ${opsData.length} prospects · ${status.notices ?? 0} notices`;
+    if (Array.isArray(status.kos) && status.kos.length) { koNames = status.kos; fillKoSelect(); }
     const pinGeo = { type: "FeatureCollection", features: (pins || []).map(p => ({
       type: "Feature", geometry: { type: "Point", coordinates: [p.lon, p.lat] },
       properties: { name: p.name, stage: p.stage, address: p.address || "" }
@@ -841,7 +858,7 @@ let ppCur = null;
 window.openProspect = function (id) {
   const o = opsData.find(x => x.id === id); if (!o) return;
   ppCur = o;
-  for (const v of ["opsView", "salesView", "researchView"]) document.getElementById(v).classList.remove("open");
+  for (const v of ["opsView", "salesView", "researchView", "peopleView"]) document.getElementById(v).classList.remove("open");
   document.getElementById("prospectPanel").classList.add("open");
   document.getElementById("ppTitle").textContent = o.name;
   document.getElementById("plOut").value = "";
@@ -1041,6 +1058,65 @@ document.getElementById("docUp").onclick = function () {
   rd.onerror = () => { msg.textContent = "could not read the file"; btn.disabled = false; };
   rd.readAsDataURL(f);
 };
+
+/* ---------- people: the person registry browser ---------- */
+let koNames = [];
+function fillKoSelect() {
+  const s = document.getElementById("pko");
+  const cur = s.value;
+  s.innerHTML = `<option value="">All municipalities</option>` + koNames.map(k => `<option ${k === cur ? "selected" : ""}>${esc(k)}</option>`).join("");
+  s.value = cur;
+}
+async function loadPeople() {
+  const el = document.getElementById("peopleBody");
+  el.innerHTML = `<p class="muted">Loading people…</p>`;
+  const q = document.getElementById("pq").value.trim();
+  const ko = document.getElementById("pko").value;
+  const st = document.getElementById("pst").value;
+  const fam = document.getElementById("pfam").checked;
+  try {
+    const rows = await api(`what=people&q=${encodeURIComponent(q)}&ko=${encodeURIComponent(ko)}&status=${encodeURIComponent(st)}&all=${fam ? "0" : "1"}&limit=200`, KEY);
+    document.getElementById("peopleN").textContent = rows.length ? `(${rows.length}${rows.length >= 200 ? "+" : ""} shown)` : "";
+    if (!rows.length) { el.innerHTML = `<div class="empty">No people match — the owner harvest is still running; try a wider search.</div>`; return; }
+    el.innerHTML = `<div class="tblwrap"><table><thead><tr>
+      <th>Person</th><th>Address (as registered)</th><th>Status</th><th class="num">Folios</th><th class="num">Parcels</th><th class="num">Area held m²</th><th>Where</th>
+    </tr></thead><tbody>` + rows.map(p => `<tr id="pr-${p.id}">
+      <td><b class="loc" style="text-decoration:underline dotted" title="Open folios and parcels" onclick="togglePerson(${p.id})">${esc(p.name)}</b></td>
+      <td class="muted">${esc(p.address || "")}</td>
+      <td><select class="stgsel" style="max-width:130px" onchange="djPersonStatusQuiet(${p.id}, this)">${PERSON_STATUSES.map(s => `<option value="${s}"${s === p.status ? " selected" : ""}>${s}</option>`).join("")}</select></td>
+      <td class="num">${p.folios}</td><td class="num">${p.parcels}</td><td class="num">${fmtN(p.area_held)}</td>
+      <td>${(p.kos || []).map(k => `<span class="chip">${esc(k)}</span>`).join("")}</td>
+    </tr>`).join("") + `</tbody></table></div>`;
+  } catch (e) { el.innerHTML = `<div class="empty">Could not load people: ${esc(e.message)}</div>`; }
+}
+window.togglePerson = async function (id) {
+  const row = document.getElementById("pr-" + id);
+  const next = row.nextElementSibling;
+  if (next && next.classList.contains("phold")) { next.remove(); return; }
+  const tr = document.createElement("tr"); tr.className = "phold";
+  tr.innerHTML = `<td colspan="7" class="muted">Loading holdings…</td>`;
+  row.after(tr);
+  try {
+    const h = await api(`what=person_holdings&id=${id}`, KEY);
+    tr.innerHTML = `<td colspan="7" style="background:var(--panel2)">` + (h.length ? h.map(f =>
+      `<div class="notice"><b>Folio ${esc(f.unit_no)}</b> <span class="muted">· k.o. ${esc(f.ko)} · share ${esc(f.share_text || "?")}${f.share_frac != null ? ` (${pctL(f.share_frac)}%)` : ""} · ${f.co_holders} co-holder(s) · <span class="chip">${esc(f.source)}</span>${f.address ? ` · ${esc(f.address)}` : ""}</span><br>` +
+      (f.parcels || []).map(p => `<span class="chip">${esc(p.parcel_no)} · ${fmtN(p.area_m2)} m² ` +
+        (p.lat ? `<span class="loc" onclick="djLocate(${p.lat}, ${p.lon})" title="Show on the map">📍</span> ` : "") +
+        `<a href="${esc(regUrl(p.nat_ref))}" target="_blank" rel="noopener" title="Open in the state registry">⚖</a> ` +
+        (p.prospect ? `<span style="color:var(--good)" title="Already a prospect">${esc(p.prospect)}</span>`
+                    : (p.lat ? `<span class="loc" onclick="djAdd('Parcel ${esc(p.parcel_no)}, ${esc(f.ko)}', ${p.lat}, ${p.lon}, this)" title="Flag as a Djedovina prospect">⚑ flag</span>` : "")) +
+        `</span>`).join(" ") + `</div>`).join("") : `<span class="muted">No holdings recorded.</span>`) + `</td>`;
+  } catch (e) { tr.innerHTML = `<td colspan="7" class="muted">Could not load holdings: ${esc(e.message)}</td>`; }
+};
+window.djPersonStatusQuiet = async function (id, sel) {
+  sel.disabled = true;
+  try { const d = await api(`what=person_status&id=${id}&status=${encodeURIComponent(sel.value)}`, KEY); if (d.error) throw new Error(d.error); }
+  catch (e) { alert("Could not save the status: " + e.message); }
+  sel.disabled = false;
+};
+document.getElementById("pGo").onclick = loadPeople;
+document.getElementById("pq").addEventListener("keydown", e => { if (e.key === "Enter") loadPeople(); });
+for (const id of ["pko", "pst", "pfam"]) document.getElementById(id).addEventListener("change", loadPeople);
 
 /* ---------- research (extract-reading queue) ---------- */
 document.getElementById("rReload").onclick = loadWorklist;
