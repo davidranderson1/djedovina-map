@@ -18,6 +18,13 @@ function authHeaders(extra) {
 
 const gate = document.getElementById("gate");
 const keyErr = document.getElementById("keyErr");
+// The source file also gets opened in code previews (Claude, GitHub, editors), where a
+// sandbox blocks the database and any redirect. Say so instead of "Failed to fetch".
+const LIVE_URL = "https://davidranderson1.github.io/djedovina-map/";
+const IS_LIVE_HOST = /github\.io$|djedovina\.(hr|com)$|^localhost$|^127\./.test(location.hostname);
+const previewHint = () => IS_LIVE_HOST ? "" :
+  ` You are looking at the source-code preview, which cannot reach the database or Google — open the live app at <a href="${LIVE_URL}" target="_blank" rel="noopener" style="color:var(--sea)">${LIVE_URL}</a>.`;
+if (!IS_LIVE_HOST) keyErr.innerHTML = previewHint();
 document.getElementById("keyGo").onclick = tryKey;
 document.getElementById("keyIn").addEventListener("keydown", e => { if (e.key === "Enter") tryKey(); });
 
@@ -37,7 +44,7 @@ async function tryKey() {
     keyErr.textContent = "";
     boot();
   } catch (e) {
-    keyErr.textContent = e.message === "unauthorized" ? "That key is not right." : "Could not reach the database: " + e.message;
+    keyErr.innerHTML = e.message === "unauthorized" ? "That key is not right." : "Could not reach the database: " + esc(e.message) + previewHint();
   }
 }
 document.getElementById("lockBtn").onclick = () => {
@@ -47,6 +54,7 @@ document.getElementById("lockBtn").onclick = () => {
 };
 document.getElementById("gGo").onclick = async () => {
   if (!SUPA) { keyErr.textContent = "Sign-in library did not load — use the team key or reload."; return; }
+  if (!IS_LIVE_HOST) { keyErr.innerHTML = "Google sign-in cannot run inside a preview." + previewHint(); return; }
   keyErr.textContent = "checking Google sign-in…";
   // Ask Supabase whether the Google provider is switched on before redirecting —
   // otherwise the redirect lands on a blank error page.
