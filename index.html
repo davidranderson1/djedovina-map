@@ -3,11 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://zoojmmcdnyciadzktqnx.supabase.co https://tile.openstreetmap.org https://server.arcgisonline.com https://nominatim.openstreetmap.org https://photon.komoot.io https://demotiles.maplibre.org https://oss.uredjenazemlja.hr https://ispu.mgipu.hr https://unpkg.com https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; frame-src https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="referrer" content="no-referrer">
 <title>Djedovina — Karta</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🫒</text></svg>">
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js"></script>
 <style>
 :root{--bg:#141F26;--panel:#1C2A33;--panel2:#17242C;--ink:#E9E0C9;--ink2:#A99F87;--line:#31434E;--olive:#93A467;--terra:#D6845A;--sea:#7FB4C4;--good:#8FBF7F;--warn:#D9B25E;--crit:#E08A6D}
 *{box-sizing:border-box;margin:0}
@@ -352,9 +354,9 @@ tr:hover td{background:var(--panel2)}
   <div class="muted" style="margin-top:5px">Zoomed out: one dot per parcel — zoom in for boundaries</div>
 </div>
 
-<script src="app-1.js?v=17"></script>
-<script src="app-2.js?v=17"></script>
-<script src="app-3.js?v=17"></script>
-<script src="app-4.js?v=17"></script>
+<script src="app-1.js?v=18"></script>
+<script src="app-2.js?v=18"></script>
+<script src="app-3.js?v=18"></script>
+<script src="app-4.js?v=18"></script>
 </body>
 </html>
