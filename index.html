@@ -111,6 +111,10 @@ tr:hover td{background:var(--panel2)}
 #actBar input,#actBar select{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:7px 8px}
 .evt{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--panel)}
 .evt .when{color:var(--ink2);font-size:11.5px}
+.evt a,.chip a,#crmBody a{color:var(--sea)}
+textarea{font:inherit}
+#crmBody .evt h3 .loc{color:var(--ink)}
+#crmBody .evt h3 .loc:hover{color:var(--sea)}
 .maplibregl-popup-content{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;font:13px/1.5 system-ui,sans-serif;padding:12px 14px;max-width:300px}
 .maplibregl-popup-content a{color:var(--sea)}
 .maplibregl-popup-content .add{margin-top:8px;background:var(--olive);color:var(--bg);border:none;font-weight:700;padding:6px 12px;border-radius:6px;cursor:pointer;font:inherit}
@@ -135,6 +139,7 @@ tr:hover td{background:var(--panel2)}
     <button data-v="map" class="on">Map</button>
     <button data-v="research">Research</button>
     <button data-v="people">People</button>
+    <button data-v="contacts">Contacts</button>
     <button data-v="activity">Activity</button>
     <button data-v="ops">Operations</button>
     <button data-v="sales">Sales</button>
@@ -150,6 +155,7 @@ tr:hover td{background:var(--panel2)}
   <button id="lblBtn" class="on" title="Show or hide parcel numbers (visible when zoomed in)">#</button>
   <button id="areaBtn" title="Draw a rectangle — every parcel inside is added to the list as one selection">▭ Area</button>
   <button id="bellBtn" title="Notifications">🔔<span id="bellN"></span></button>
+  <button id="askBtn" title="Ask about anyone we have met — a name, a place, a month">💬 Ask</button>
   <button id="helpBtn" title="Features and guided tour">? Features</button>
   <button id="settingsBtn" title="Settings">⚙</button>
   <button id="filtersBtn">Filters</button>
@@ -262,6 +268,24 @@ tr:hover td{background:var(--panel2)}
     <div id="actBody"></div>
   </div>
 
+  <div class="oview" id="contactsView">
+    <h2>Contacts — everyone we meet, and what happened <span class="muted" id="crmN"></span></h2>
+    <p class="sub">Brokers, owners, heirs, lawyers, notaries, officials — one card per person or organisation, tied to the parcels, prospects and folios they concern, with every meeting, call and document. <b>Ask</b> in plain words: <i>tell me about the guy we met at our house back in September</i>.</p>
+    <div class="subtabs" id="crmTabs"><button data-m="ask" class="on">💬 Ask</button><button data-m="contacts">People &amp; organisations</button><button data-m="meetings">Meetings &amp; calls</button><button data-m="documents">Documents</button><button data-m="places">Named places</button></div>
+    <div id="askBar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <input id="askIn" placeholder="Ask… e.g. who is the Sotheby's agent, meetings at our house last month, the contract from Sotheby's" style="flex:1;min-width:320px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:9px 10px;font-size:14px" autocomplete="off">
+      <button id="askGo" class="add" style="background:var(--olive);color:var(--bg);border:none;font-weight:700;padding:9px 14px;border-radius:6px;cursor:pointer">Ask</button>
+      <div id="askChips" style="display:flex;gap:6px;flex-wrap:wrap;width:100%">
+        <span class="chip loc" data-q="tell me about the guy we met at our house back in September">the guy we met at our house in September</span>
+        <span class="chip loc" data-q="who is the Sotheby's agent">who is the Sotheby's agent</span>
+        <span class="chip loc" data-q="meetings this month">meetings this month</span>
+        <span class="chip loc" data-q="open next steps">open next steps</span>
+        <span class="chip loc" data-q="who owns the Kučine house">who owns the Kučine house</span>
+      </div>
+    </div>
+    <div id="crmBody"></div>
+  </div>
+
   <div class="oview" id="helpView">
     <h2>Features — what this app does, and how to use it</h2>
     <p class="sub">Djedovina's working tool, from the first parcel on the map to the signed contract. Each card says what a feature is for and how to use it; <b>Show me</b> jumps straight to it. New here? <button id="tourStart" class="add" style="background:var(--olive);color:var(--bg);border:none;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer">Start the guided tour</button></p>
@@ -327,6 +351,12 @@ tr:hover td{background:var(--panel2)}
         <button id="docUp" style="margin-top:6px">Upload to vault</button><span id="docMsg" class="muted" style="margin-left:8px;font-size:12px"></span>
         <p class="muted" style="font-size:11.5px;margin-top:8px">Extracts, powers of attorney, pre-contracts. Private storage; links expire after an hour. 15 MB per file.</p>
       </div>
+      <div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;grid-column:1/-1">
+        <h3 style="font-size:14px;margin-bottom:8px">Contacts &amp; meetings <span class="muted" id="ppCrmN"></span></h3>
+        <div id="ppCrm"></div>
+        <button id="ppCrmLog" style="margin-top:8px">+ Log a meeting about this prospect</button>
+        <p class="muted" style="font-size:11.5px;margin-top:8px">Everyone tied to this prospect — owners, heirs, brokers, lawyers — and every meeting logged here. Open a name for the full card.</p>
+      </div>
     </div>
   </div>
 </main>
@@ -354,9 +384,10 @@ tr:hover td{background:var(--panel2)}
   <div class="muted" style="margin-top:5px">Zoomed out: one dot per parcel — zoom in for boundaries</div>
 </div>
 
-<script src="app-1.js?v=18"></script>
-<script src="app-2.js?v=18"></script>
-<script src="app-3.js?v=18"></script>
-<script src="app-4.js?v=18"></script>
+<script src="app-1.js?v=19"></script>
+<script src="app-2.js?v=19"></script>
+<script src="app-3.js?v=19"></script>
+<script src="app-4.js?v=19"></script>
+<script src="app-5.js?v=19"></script>
 </body>
 </html>
