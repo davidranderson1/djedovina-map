@@ -204,8 +204,8 @@ async function loadLedger() {
 window.djPersonStatus = async function (id, sel) {
   sel.disabled = true;
   try {
-    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=person_set`, {
-      method: "POST", headers: authHeaders({ "content-type": "application/json" }), body: JSON.stringify({ id, status: sel.value })
+    const r = await fetch(`${ENDPOINT}?what=person_set`, {
+      method: "POST", headers: authHeaders({ "content-type": "application/json", "x-team-key": KEY ?? "" }), body: JSON.stringify({ id, status: sel.value })
     });
     const d = await r.json(); if (d.error) throw new Error(d.error);
   } catch (e) { alert("Could not save the status: " + e.message); }
@@ -214,8 +214,8 @@ window.djPersonStatus = async function (id, sel) {
 window.djLink = async function (entryId, personId, btn) {
   btn.disabled = true; btn.textContent = "linking…";
   try {
-    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=stake_link`, {
-      method: "POST", headers: authHeaders({ "content-type": "application/json" }), body: JSON.stringify({ entry_id: entryId, person_id: personId })
+    const r = await fetch(`${ENDPOINT}?what=stake_link`, {
+      method: "POST", headers: authHeaders({ "content-type": "application/json", "x-team-key": KEY ?? "" }), body: JSON.stringify({ entry_id: entryId, person_id: personId })
     });
     const d = await r.json(); if (d.error) throw new Error(d.error);
   } catch (e) { alert("Could not link: " + e.message); }
@@ -228,8 +228,8 @@ document.getElementById("lhAdd").onclick = async function () {
   if (!name) { msg.textContent = "the holder's name is required"; return; }
   this.disabled = true; msg.textContent = "saving…";
   try {
-    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=ledger_add`, {
-      method: "POST", headers: authHeaders({ "content-type": "application/json" }),
+    const r = await fetch(`${ENDPOINT}?what=ledger_add`, {
+      method: "POST", headers: authHeaders({ "content-type": "application/json", "x-team-key": KEY ?? "" }),
       body: JSON.stringify({ prospect_id: ppCur.id, unit_no: g("lhUnit") || null, name,
         share: g("lhShare") || null, address: g("lhAddr") || null, source: document.getElementById("lhSource").value })
     });
@@ -263,8 +263,8 @@ document.getElementById("hAdd").onclick = async function () {
   const contact = g("hContact");
   this.disabled = true; msg.textContent = "saving…";
   try {
-    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=heir_add`, {
-      method: "POST", headers: authHeaders({ "content-type": "application/json" }),
+    const r = await fetch(`${ENDPOINT}?what=heir_add`, {
+      method: "POST", headers: authHeaders({ "content-type": "application/json", "x-team-key": KEY ?? "" }),
       body: JSON.stringify({ prospect_id: ppCur.id, name, relation: g("hRel") || null, share: g("hShare") || null,
         country: g("hCountry") || null, language: g("hLang") || null,
         phone: contact && !contact.includes("@") ? contact : null,
@@ -326,8 +326,8 @@ document.getElementById("docUp").onclick = function () {
   rd.onload = async () => {
     try {
       const b64 = String(rd.result).split(",")[1];
-      const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=doc_upload`, {
-        method: "POST", headers: authHeaders({ "content-type": "application/json" }),
+      const r = await fetch(`${ENDPOINT}?what=doc_upload`, {
+        method: "POST", headers: authHeaders({ "content-type": "application/json", "x-team-key": KEY ?? "" }),
         body: JSON.stringify({ prospect_id: ppCur.id, file_name: f.name, content_type: f.type || "application/octet-stream", data_base64: b64 })
       });
       const d = await r.json();
@@ -341,4 +341,3 @@ document.getElementById("docUp").onclick = function () {
   rd.onerror = () => { msg.textContent = "could not read the file"; btn.disabled = false; };
   rd.readAsDataURL(f);
 };
-
