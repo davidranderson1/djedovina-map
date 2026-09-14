@@ -22,7 +22,9 @@ document.getElementById("keyGo").onclick = tryKey;
 document.getElementById("keyIn").addEventListener("keydown", e => { if (e.key === "Enter") tryKey(); });
 
 async function api(qs, key) {
-  const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key ?? "")}&${qs}`, { headers: authHeaders() });
+  // Team key travels in a header, never in the URL, so it cannot land in request logs.
+  const k = key ?? KEY ?? "";
+  const r = await fetch(`${ENDPOINT}?${qs}`, { headers: authHeaders(k ? { "x-team-key": k } : {}) });
   if (r.status === 401) throw new Error("unauthorized");
   if (!r.ok) throw new Error("server " + r.status);
   return r.json();
@@ -111,9 +113,10 @@ function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;
 function fmtN(n) { return n == null ? "—" : Math.round(n).toLocaleString(); }
 // Deep link into the state registry: resolves the parcel's possession sheet
 // server-side and redirects; falls back to the registry's search page.
+// The registry endpoint is public — no key travels in this link.
 function regUrl(natRef) {
   return natRef
-    ? `${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=registry&ref=${encodeURIComponent(natRef)}`
+    ? `${ENDPOINT}?what=registry&ref=${encodeURIComponent(natRef)}`
     : "https://oss.uredjenazemlja.hr/public-services/search-cad-parcel";
 }
 
@@ -210,8 +213,8 @@ function bindDraw() {
     const label = prompt(`${seen.size} parcel(s) inside the rectangle.\nName this selection:`, def);
     if (label === null) return;
     try {
-      const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=add_area`, {
-        method: "POST", headers: authHeaders({ "content-type": "application/json" }),
+      const r = await fetch(`${ENDPOINT}?what=add_area`, {
+        method: "POST", headers: authHeaders({ "content-type": "application/json", "x-team-key": KEY ?? "" }),
         body: JSON.stringify({ label: label || def, parcel_ids: [...seen.keys()] })
       });
       const d = await r.json();
@@ -435,4 +438,3 @@ async function loadViewportParcels() {
     applyFilters();
   } catch (e) { /* keep whatever is already loaded */ }
 }
-
