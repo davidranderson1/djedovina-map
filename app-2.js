@@ -36,8 +36,10 @@ function openParcelPopup(p, lngLat) {
     `<br>Owners recorded: ${p.owners_known ?? 0}${p.zoning ? " · zoning: " + esc(p.zoning) : ""}${p.read ? " · <span style='color:var(--good)'>extract read ✓</span>" : ""}` +
     svEmbed +
     `<br><a href="${g}" target="_blank" rel="noopener">Google Maps</a> · <a href="${sv}" target="_blank" rel="noopener">Street View</a> · <a href="${esc(regUrl(p.nat_ref))}" target="_blank" rel="noopener" title="Opens this parcel's possession sheet in the state registry">Registry: this parcel</a>` +
-    (!hasProspect ? `<br><button class="add" onclick="djAdd('Parcel ${esc(p.parcel_no)}, ${esc(p.ko || "")}', ${p.lat}, ${p.lon}, this)">+ Add to Djedovina</button>` : "")
+    (!hasProspect ? `<br><button class="add" onclick="djAdd('Parcel ${esc(p.parcel_no)}, ${esc(p.ko || "")}', ${p.lat}, ${p.lon}, this)">+ Add to Djedovina</button>` : "") +
+    (p.__id != null ? `<div id="crmPop-${p.__id}"></div>` : "")
   ).addTo(map);
+  if (p.__id != null && window.crmParcelPopup) crmParcelPopup(p.__id, "crmPop-" + p.__id);
 }
 window.djAdd = async function (label, lat, lon, btn) {
   if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
@@ -140,7 +142,7 @@ let ppCur = null;
 window.openProspect = function (id) {
   const o = opsData.find(x => x.id === id); if (!o) return;
   ppCur = o;
-  for (const v of ["opsView", "salesView", "researchView", "peopleView", "activityView", "helpView"]) document.getElementById(v).classList.remove("open");
+  for (const v of ["opsView", "salesView", "researchView", "peopleView", "activityView", "helpView", "contactsView"]) document.getElementById(v).classList.remove("open");
   document.getElementById("prospectPanel").classList.add("open");
   document.getElementById("ppTitle").textContent = o.name;
   document.getElementById("plOut").value = "";
@@ -149,6 +151,7 @@ window.openProspect = function (id) {
   document.getElementById("docMsg").textContent = "";
   document.getElementById("lhMsg").textContent = "";
   loadLedger(); loadHeirs(); loadDocs();
+  if (window.loadProspectCrm) loadProspectCrm();
 };
 document.getElementById("ppBack").onclick = () => setView("ops");
 
