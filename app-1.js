@@ -133,6 +133,7 @@ function setView(v) {
   document.getElementById("researchView").classList.toggle("open", v === "research");
   document.getElementById("peopleView").classList.toggle("open", v === "people");
   document.getElementById("activityView").classList.toggle("open", v === "activity");
+  document.getElementById("contactsView").classList.toggle("open", v === "contacts");
   document.getElementById("helpView").classList.toggle("open", v === "help");
   document.getElementById("helpBtn").classList.toggle("on", v === "help");
   document.getElementById("prospectPanel").classList.remove("open");
@@ -142,6 +143,7 @@ function setView(v) {
   if (v === "research") loadWorklist();
   if (v === "people") loadPeople();
   if (v === "activity") loadActivity();
+  if (v === "contacts") loadContacts();
   if (v === "help") renderFeatures();
 }
 document.getElementById("helpBtn").onclick = () => setView(document.getElementById("helpView").classList.contains("open") ? "map" : "help");
@@ -314,7 +316,7 @@ async function loadData() {
           `<br><span class="muted">parcel ${esc(p.parcel_no)}</span>` +
           (dl != null ? `<br><b style="color:${dl <= 10 ? "var(--crit)" : "var(--warn)"}">${dl} days left to respond</b>` : "")).addTo(map);
       });
-      map.on("click", "parcel-fill", e => { if (!drawMode) openParcelPopup(e.features[0].properties, e.lngLat); });
+      map.on("click", "parcel-fill", e => { if (!drawMode) openParcelPopup(Object.assign({ __id: e.features[0].id }, e.features[0].properties), e.lngLat); });
       for (const l of ["parcel-fill", "pin-dots", "notice-dots"]) {
         map.on("mouseenter", l, () => { if (!drawMode) map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", l, () => { if (!drawMode) map.getCanvas().style.cursor = ""; });
