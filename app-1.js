@@ -18,18 +18,13 @@ function authHeaders(extra) {
 
 const gate = document.getElementById("gate");
 const keyErr = document.getElementById("keyErr");
-// The source file also gets opened in code previews (Claude, GitHub, editors), where a
-// sandbox blocks the database and any redirect. Say so instead of "Failed to fetch".
-const LIVE_URL = "https://davidranderson1.github.io/djedovina-map/";
-const IS_LIVE_HOST = /github\.io$|djedovina\.(hr|com)$|^localhost$|^127\./.test(location.hostname);
-const previewHint = () => IS_LIVE_HOST ? "" :
-  ` You are looking at the source-code preview, which cannot reach the database or Google — open the live app at <a href="${LIVE_URL}" target="_blank" rel="noopener" style="color:var(--sea)">${LIVE_URL}</a>.`;
-if (!IS_LIVE_HOST) keyErr.innerHTML = previewHint();
 document.getElementById("keyGo").onclick = tryKey;
 document.getElementById("keyIn").addEventListener("keydown", e => { if (e.key === "Enter") tryKey(); });
 
 async function api(qs, key) {
-  const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(key ?? "")}&${qs}`, { headers: authHeaders() });
+  // Team key travels in a header, never in the URL, so it cannot land in request logs.
+  const k = key ?? KEY ?? "";
+  const r = await fetch(`${ENDPOINT}?${qs}`, { headers: authHeaders(k ? { "x-team-key": k } : {}) });
   if (r.status === 401) throw new Error("unauthorized");
   if (!r.ok) throw new Error("server " + r.status);
   return r.json();
@@ -44,7 +39,7 @@ async function tryKey() {
     keyErr.textContent = "";
     boot();
   } catch (e) {
-    keyErr.innerHTML = e.message === "unauthorized" ? "That key is not right." : "Could not reach the database: " + esc(e.message) + previewHint();
+    keyErr.textContent = e.message === "unauthorized" ? "That key is not right." : "Could not reach the database: " + e.message;
   }
 }
 document.getElementById("lockBtn").onclick = () => {
@@ -54,7 +49,6 @@ document.getElementById("lockBtn").onclick = () => {
 };
 document.getElementById("gGo").onclick = async () => {
   if (!SUPA) { keyErr.textContent = "Sign-in library did not load — use the team key or reload."; return; }
-  if (!IS_LIVE_HOST) { keyErr.innerHTML = "Google sign-in cannot run inside a preview." + previewHint(); return; }
   keyErr.textContent = "checking Google sign-in…";
   // Ask Supabase whether the Google provider is switched on before redirecting —
   // otherwise the redirect lands on a blank error page.
@@ -119,9 +113,10 @@ function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;
 function fmtN(n) { return n == null ? "—" : Math.round(n).toLocaleString(); }
 // Deep link into the state registry: resolves the parcel's possession sheet
 // server-side and redirects; falls back to the registry's search page.
+// The registry endpoint is public — no key travels in this link.
 function regUrl(natRef) {
   return natRef
-    ? `${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=registry&ref=${encodeURIComponent(natRef)}`
+    ? `${ENDPOINT}?what=registry&ref=${encodeURIComponent(natRef)}`
     : "https://oss.uredjenazemlja.hr/public-services/search-cad-parcel";
 }
 
@@ -138,6 +133,7 @@ function setView(v) {
   document.getElementById("researchView").classList.toggle("open", v === "research");
   document.getElementById("peopleView").classList.toggle("open", v === "people");
   document.getElementById("activityView").classList.toggle("open", v === "activity");
+  document.getElementById("contactsView").classList.toggle("open", v === "contacts");
   document.getElementById("helpView").classList.toggle("open", v === "help");
   document.getElementById("helpBtn").classList.toggle("on", v === "help");
   document.getElementById("prospectPanel").classList.remove("open");
@@ -147,6 +143,7 @@ function setView(v) {
   if (v === "research") loadWorklist();
   if (v === "people") loadPeople();
   if (v === "activity") loadActivity();
+  if (v === "contacts") loadContacts();
   if (v === "help") renderFeatures();
 }
 document.getElementById("helpBtn").onclick = () => setView(document.getElementById("helpView").classList.contains("open") ? "map" : "help");
@@ -218,8 +215,8 @@ function bindDraw() {
     const label = prompt(`${seen.size} parcel(s) inside the rectangle.\nName this selection:`, def);
     if (label === null) return;
     try {
-      const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=add_area`, {
-        method: "POST", headers: authHeaders({ "content-type": "application/json" }),
+      const r = await fetch(`${ENDPOINT}?what=add_area`, {
+        method: "POST", headers: authHeaders({ "content-type": "application/json", "x-team-key": KEY ?? "" }),
         body: JSON.stringify({ label: label || def, parcel_ids: [...seen.keys()] })
       });
       const d = await r.json();
@@ -319,7 +316,7 @@ async function loadData() {
           `<br><span class="muted">parcel ${esc(p.parcel_no)}</span>` +
           (dl != null ? `<br><b style="color:${dl <= 10 ? "var(--crit)" : "var(--warn)"}">${dl} days left to respond</b>` : "")).addTo(map);
       });
-      map.on("click", "parcel-fill", e => { if (!drawMode) openParcelPopup(e.features[0].properties, e.lngLat); });
+      map.on("click", "parcel-fill", e => { if (!drawMode) openParcelPopup(Object.assign({ __id: e.features[0].id }, e.features[0].properties), e.lngLat); });
       for (const l of ["parcel-fill", "pin-dots", "notice-dots"]) {
         map.on("mouseenter", l, () => { if (!drawMode) map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", l, () => { if (!drawMode) map.getCanvas().style.cursor = ""; });
@@ -443,4 +440,3 @@ async function loadViewportParcels() {
     applyFilters();
   } catch (e) { /* keep whatever is already loaded */ }
 }
-
