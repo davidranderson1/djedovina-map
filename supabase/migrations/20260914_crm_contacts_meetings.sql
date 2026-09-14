@@ -215,22 +215,77 @@ begin
   return q;
 end $$;
 
+-- Which optional columns the existing tables have (the schema has evolved since 2026-08-27).
+create or replace function public.crm_has_column(p_table text, p_column text) returns boolean
+language sql stable as $$
+  select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = p_table and column_name = p_column)
+$$;
+
+-- Coordinates, municipality and registry reference for a parcel, whatever the parcel table looks like:
+-- ko text column or ko_id → cadastral_municipality.name; lat/lon columns or a centroid_wgs84 geometry.
+create or replace function public.crm_parcel_brief(p_id bigint) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare j jsonb; sql text;
+begin
+  if to_regclass('public.parcel') is null then return jsonb_build_object('parcel_id', p_id); end if;
+  sql := 'select jsonb_build_object(''parcel_id'', p.id, ''parcel_no'', p.parcel_no, ''area_m2'', p.area_m2'
+      || ', ''ko'', ' || case when crm_has_column('parcel', 'ko') then 'p.ko' when crm_has_column('parcel', 'ko_id') and to_regclass('public.cadastral_municipality') is not null then 'cm.name' else 'null' end
+      || ', ''lat'', ' || case when crm_has_column('parcel', 'lat') then 'p.lat' when crm_has_column('parcel', 'centroid_wgs84') then 'st_y(p.centroid_wgs84)' else 'null' end
+      || ', ''lon'', ' || case when crm_has_column('parcel', 'lon') then 'p.lon' when crm_has_column('parcel', 'centroid_wgs84') then 'st_x(p.centroid_wgs84)' else 'null' end
+      || ', ''nat_ref'', ' || case when crm_has_column('parcel', 'nat_ref') then 'p.nat_ref' else 'null' end
+      || ') from public.parcel p '
+      || case when not crm_has_column('parcel', 'ko') and crm_has_column('parcel', 'ko_id') and to_regclass('public.cadastral_municipality') is not null then 'left join public.cadastral_municipality cm on cm.id = p.ko_id ' else '' end
+      || 'where p.id = $1';
+  begin
+    execute sql into j using p_id;
+  exception when others then j := null; end;
+  return coalesce(j, jsonb_build_object('parcel_id', p_id));
+end $$;
+
+-- Find a parcel by municipality name fragment (unaccented) and parcel number; returns id and WGS84 centre.
+create or replace function public.crm_find_parcel(p_ko_like text, p_parcel_no text) returns table (id bigint, lat double precision, lon double precision)
+language plpgsql stable security definer set search_path = public as $$
+declare sql text;
+begin
+  if to_regclass('public.parcel') is null then return; end if;
+  sql := 'select p.id, '
+      || case when crm_has_column('parcel', 'lat') then 'p.lat::double precision' when crm_has_column('parcel', 'centroid_wgs84') then 'st_y(p.centroid_wgs84)::double precision' else 'null::double precision' end || ', '
+      || case when crm_has_column('parcel', 'lon') then 'p.lon::double precision' when crm_has_column('parcel', 'centroid_wgs84') then 'st_x(p.centroid_wgs84)::double precision' else 'null::double precision' end
+      || ' from public.parcel p '
+      || case when not crm_has_column('parcel', 'ko') and crm_has_column('parcel', 'ko_id') and to_regclass('public.cadastral_municipality') is not null then 'left join public.cadastral_municipality cm on cm.id = p.ko_id ' else '' end
+      || 'where p.parcel_no = $2 and crm_unaccent('
+      || case when crm_has_column('parcel', 'ko') then 'p.ko' when crm_has_column('parcel', 'ko_id') and to_regclass('public.cadastral_municipality') is not null then 'cm.name' else '''''' end
+      || ') like ''%'' || crm_unaccent($1) || ''%'' order by p.id limit 1';
+  return query execute sql using p_ko_like, p_parcel_no;
+end $$;
+
 -- Human label for a linked record, looked up in the existing tables when they exist.
 create or replace function public.crm_target_label(p_type text, p_id bigint) returns text
 language plpgsql stable security definer set search_path = public as $$
-declare l text;
+declare l text; b jsonb;
 begin
   begin
-    if p_type = 'parcel' and to_regclass('public.parcel') is not null then
-      execute 'select ''Parcel '' || parcel_no || '' · '' || coalesce(ko, '''') from public.parcel where id = $1' into l using p_id;
+    if p_type = 'parcel' then
+      b := crm_parcel_brief(p_id);
+      if b ? 'parcel_no' then l := 'Parcel ' || (b->>'parcel_no') || coalesce(' · ' || (b->>'ko'), ''); end if;
     elsif p_type = 'prospect' and to_regclass('public.prospect') is not null then
       execute 'select name from public.prospect where id = $1' into l using p_id;
     elsif p_type = 'folio' and to_regclass('public.lr_unit') is not null then
-      execute 'select ''Folio '' || unit_no || '' · '' || coalesce(ko, '''') from public.lr_unit where id = $1' into l using p_id;
+      if crm_has_column('lr_unit', 'ko') then
+        execute 'select ''Folio '' || unit_no || '' · '' || coalesce(ko, '''') from public.lr_unit where id = $1' into l using p_id;
+      elsif crm_has_column('lr_unit', 'ko_id') and to_regclass('public.cadastral_municipality') is not null then
+        execute 'select ''Folio '' || u.unit_no || '' · '' || coalesce(cm.name, '''') from public.lr_unit u left join public.cadastral_municipality cm on cm.id = u.ko_id where u.id = $1' into l using p_id;
+      else
+        execute 'select ''Folio '' || unit_no from public.lr_unit where id = $1' into l using p_id;
+      end if;
     elsif p_type = 'person' and to_regclass('public.person') is not null then
       execute 'select name from public.person where id = $1' into l using p_id;
-    elsif p_type = 'heir' and to_regclass('public.heir') is not null then
-      execute 'select name from public.heir where id = $1' into l using p_id;
+    elsif p_type = 'heir' then
+      if to_regclass('public.heir') is not null then
+        execute 'select name from public.heir where id = $1' into l using p_id;
+      elsif to_regclass('public.contact') is not null and crm_has_column('contact', 'full_name') then
+        execute 'select full_name from public.contact where id = $1' into l using p_id;
+      end if;
     elsif p_type = 'contact' then
       select name into l from public.crm_contact where id = p_id;
     elsif p_type = 'document' then
@@ -240,17 +295,6 @@ begin
     end if;
   exception when others then l := null; end;
   return l;
-end $$;
-
--- Coordinates + registry reference for a parcel (used by the cards), tolerant of schema differences.
-create or replace function public.crm_parcel_brief(p_id bigint) returns jsonb
-language plpgsql stable security definer set search_path = public as $$
-declare j jsonb;
-begin
-  begin
-    execute 'select jsonb_build_object(''parcel_id'', id, ''parcel_no'', parcel_no, ''ko'', ko, ''area_m2'', area_m2, ''lat'', lat, ''lon'', lon, ''nat_ref'', nat_ref) from public.parcel where id = $1' into j using p_id;
-  exception when others then j := null; end;
-  return coalesce(j, jsonb_build_object('parcel_id', p_id));
 end $$;
 
 -- ---------------------------------------------------------------- the profile card
@@ -436,7 +480,7 @@ revoke all on public.crm_contact, public.crm_interaction, public.crm_interaction
 do $$
 declare f text;
 begin
-  foreach f in array array['crm_unaccent(text)', 'crm_terms_query(text[])', 'crm_target_label(text,bigint)', 'crm_parcel_brief(bigint)',
+  foreach f in array array['crm_unaccent(text)', 'crm_terms_query(text[])', 'crm_has_column(text,text)', 'crm_target_label(text,bigint)', 'crm_parcel_brief(bigint)', 'crm_find_parcel(text,text)',
                            'crm_contact_card(bigint)', 'crm_interaction_card(bigint)',
                            'crm_ask(text[],timestamptz,timestamptz,text[],text[],text,int)', 'crm_for_target(text,bigint)', 'crm_status()'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', f);

@@ -53,18 +53,22 @@ begin
   select id into v_david from public.crm_contact where kind = 'person' and name = 'David Anderson' limit 1;
 
   -- ---------------- the parcels and the prospect (looked up; skipped when not present)
-  begin
-    execute $q$select id, lat, lon from public.parcel where upper(ko) like 'KU%INE%' and parcel_no = '1245/4' limit 1$q$ into v_p4, v_lat, v_lon;
-    execute $q$select id from public.parcel where upper(ko) like 'KU%INE%' and parcel_no = '1245/5' limit 1$q$ into v_p5;
-  exception when others then v_p4 := null; v_p5 := null; end;
+  select f.id, f.lat, f.lon into v_p4, v_lat, v_lon from public.crm_find_parcel('kucine', '1245/4') f;
+  select f.id into v_p5 from public.crm_find_parcel('kucine', '1245/5') f;
   begin
     if v_p4 is not null and to_regclass('public.prospect_parcel') is not null then
-      execute $q$select prospect_id from public.prospect_parcel where parcel_id = $1 limit 1$q$ into v_prospect using v_p4;
+      execute $q$select prospect_id from public.prospect_parcel where parcel_id = $1 order by prospect_id limit 1$q$ into v_prospect using v_p4;
     end if;
+  exception when others then null; end;
+  begin
     if v_prospect is null and to_regclass('public.prospect') is not null then
-      execute $q$select id from public.prospect where crm_unaccent(name) like '%kucine%' or crm_unaccent(coalesce(address, '')) like '%kucine%' or crm_unaccent(coalesce(address, '')) like '%markovica 70%' order by id limit 1$q$ into v_prospect;
+      if crm_has_column('prospect', 'address') then
+        execute $q$select id from public.prospect where crm_unaccent(name) like '%kucine%' or crm_unaccent(coalesce(address, '')) like '%kucine%' or crm_unaccent(coalesce(address, '')) like '%markovica 70%' order by id limit 1$q$ into v_prospect;
+      else
+        execute $q$select id from public.prospect where crm_unaccent(name) like '%kucine%' order by id limit 1$q$ into v_prospect;
+      end if;
     end if;
-  exception when others then v_prospect := null; end;
+  exception when others then null; end;
 
   -- ---------------- the meeting (13 Sep 2026, time not recorded)
   insert into public.crm_interaction (kind, occurred_at, time_known, title, summary, details, outcome, next_step, next_step_due, location_text, lat, lon, parcel_id, prospect_id, created_by)
