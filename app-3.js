@@ -153,8 +153,8 @@ window.pplFamily = function (surname, ko) {
 window.djLinkQ = async function (entryId, personId, btn) {
   btn.disabled = true; btn.textContent = "linking…";
   try {
-    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=stake_link`, {
-      method: "POST", headers: authHeaders({ "content-type": "application/json" }), body: JSON.stringify({ entry_id: entryId, person_id: personId })
+    const r = await fetch(`${ENDPOINT}?what=stake_link`, {
+      method: "POST", headers: authHeaders({ "content-type": "application/json", "x-team-key": KEY ?? "" }), body: JSON.stringify({ entry_id: entryId, person_id: personId })
     });
     const d = await r.json(); if (d.error) throw new Error(d.error);
     const row = document.getElementById("mq-" + entryId); if (row) row.remove();
@@ -243,7 +243,7 @@ async function loadActivity() {
       const rows = await api(`what=changes&ko=${encodeURIComponent(ko)}&since=${encodeURIComponent(since)}&watched=${w}&limit=200`, KEY);
       document.getElementById("actN").textContent = rows.length ? `(${rows.length} events)` : "";
       if (!rows.length) {
-        el.innerHTML = `<div class="empty">No changes recorded yet${w === "1" ? " on watched items" : ""} in this period.<br><span class="muted">Change events only start once a parcel has been read a second time — the first full pass is still running; re-reads begin two weeks after each parcel's first read. Add 👁 watches now so the first changes ring the bell.</span></div>`;
+        el.innerHTML = `<div class="empty">No changes recorded yet${esc(w === "1" ? " on watched items" : "")} in this period.<br><span class="muted">Change events only start once a parcel has been read a second time — the first full pass is still running; re-reads begin two weeks after each parcel's first read. Add 👁 watches now so the first changes ring the bell.</span></div>`;
         return;
       }
       el.innerHTML = rows.map(ev => `<div class="evt">
@@ -330,4 +330,3 @@ document.getElementById("ppPrint").onclick = () => {
     <script>setTimeout(function(){window.print()},300)<\/script></body></html>`);
   w.document.close();
 };
-

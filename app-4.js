@@ -16,6 +16,8 @@ const FEATURES = [
   { t: "Operations & Sales", v: "ops", d: "The pipeline in 15 stages, from Territory chosen to Exit. Operations is the working list; Sales is the money book from valuation onward.", h: "Change a stage in place — it is journalled. Open a prospect's file for ledger, heirs, pledge letters and the document vault." },
   { t: "Pledge letters & documents", v: "ops", d: "First-contact letters in Croatian, English, German and Italian built around the promise that nothing happens without a signature; a private vault for extracts, powers of attorney and pre-contracts.", h: "Inside a prospect's file. Copying a letter journals it." },
   { t: "Field dossier", v: "ops", d: "A printable one-page pack for a family visit: parcels, folios, holders and shares, heirs, and space for notes.", h: "Open a prospect → 🖨 Print dossier." },
+  { t: "Contacts — everyone we meet", v: "contacts", m: "contacts", d: "Brokers, owners, heirs, lawyers, notaries, officials: one card per person or organisation with phone, email, how we met, and every parcel, prospect and folio they are tied to. Log a meeting and the people in it are created automatically.", h: "Contacts tab → People & organisations. + New contact, or + Log a meeting. Every parcel popup and prospect file shows who is tied to it." },
+  { t: "Ask — questions in plain words", v: "contacts", m: "ask", d: "\"Tell me about the guy we met at our house back in September\", \"who is the Sotheby's agent\", \"meetings at our house last month\", \"the contract from Sotheby's\" — the answer comes back as a profile card with the meetings, documents and parcels behind it. Named places (our house, Marko's office) make the questions natural.", h: "💬 Ask in the header, or the Ask tab under Contacts. Manage the named places under Named places." },
   { t: "Court notices", v: "map", d: "Probate and title-correction notices harvested hourly from the courts, matched to parcels on the map with days-left-to-respond.", h: "Court notices button; blue rings on the map." },
   { t: "Notifications & sign-in", v: "map", d: "The bell shows every change since you last looked, plus court notices and watched-folio changes. Each team member signs in with their own Google account.", h: "Settings ⚙ for the shared Google Maps key (Street View in popups). Lock signs out." },
 ];
@@ -26,9 +28,10 @@ window.featGo = function (i) {
   const f = FEATURES[i];
   if (f.m && f.v === "people") { pplMode = f.m; document.querySelectorAll("#pplTabs button").forEach(x => x.classList.toggle("on", x.dataset.m === f.m)); }
   if (f.m && f.v === "activity") { actMode = f.m; actUnit = null; document.querySelectorAll("#actTabs button").forEach(x => x.classList.toggle("on", x.dataset.m === f.m)); }
+  if (f.m && f.v === "contacts") { crmMode = f.m; crmCard = null; }
   setView(f.v);
 };
-const TOUR = [0, 1, 4, 5, 6, 8, 9, 10, 13, 15];
+const TOUR = [0, 1, 4, 5, 6, 8, 9, 10, 13, 15, 16, 17];
 let tourAt = -1;
 function tourShow() {
   const card = document.getElementById("tourCard");
@@ -62,7 +65,7 @@ async function loadWorklist() {
   try {
     const items = await api(`what=worklist&limit=25${cur ? "&ko=" + encodeURIComponent(cur) : ""}`, KEY);
     if (!items.length) { el.innerHTML = `<div class="empty">Queue is empty for this selection — every loaded parcel here has been read.</div>`; return; }
-    el.innerHTML = items.map(w => `<div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px" id="wl-${w.parcel_id}">
+    el.innerHTML = items.map(w => `<div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px" id="wl-${esc(w.parcel_id)}">
       <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
         <b>Parcel ${esc(w.parcel_no)}</b><span class="muted">${esc(w.ko || "")} · ${fmtN(w.area_m2)} m²${w.prospect ? " · prospect: " + esc(w.prospect) : ""}</span>
         <span class="spacer" style="flex:1"></span>
@@ -96,15 +99,15 @@ window.djSaveExtract = async function (pid, btn) {
   });
   btn.disabled = true; btn.textContent = "Saving…";
   try {
-    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=save_extract`, {
-      method: "POST", headers: authHeaders({ "content-type": "application/json" }),
+    const r = await fetch(`${ENDPOINT}?what=save_extract`, {
+      method: "POST", headers: authHeaders({ "content-type": "application/json", "x-team-key": KEY ?? "" }),
       body: JSON.stringify({ parcel_id: pid, unit_no: g("wu").value, plomba: g("wp").checked,
         encumbrances: g("we").value, zoning: g("wz").value || null, owners })
     });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     const card = document.getElementById("wl-" + pid);
-    card.innerHTML = `<b style="color:var(--good)">Saved ✓</b> <span class="muted">folio recorded, ${d.owners_saved} owner line(s)</span>`;
+    card.innerHTML = `<b style="color:var(--good)">Saved ✓</b> <span class="muted">folio recorded, ${esc(d.owners_saved)} owner line(s)</span>`;
     setTimeout(() => card.remove(), 1500);
     loadData();
   } catch (e) { btn.disabled = false; btn.textContent = "Failed — try again (" + e.message + ")"; }
