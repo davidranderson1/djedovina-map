@@ -62,7 +62,7 @@ async function loadWorklist() {
   try {
     const items = await api(`what=worklist&limit=25${cur ? "&ko=" + encodeURIComponent(cur) : ""}`, KEY);
     if (!items.length) { el.innerHTML = `<div class="empty">Queue is empty for this selection — every loaded parcel here has been read.</div>`; return; }
-    el.innerHTML = items.map(w => `<div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px" id="wl-${w.parcel_id}">
+    el.innerHTML = items.map(w => `<div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px" id="wl-${esc(w.parcel_id)}">
       <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
         <b>Parcel ${esc(w.parcel_no)}</b><span class="muted">${esc(w.ko || "")} · ${fmtN(w.area_m2)} m²${w.prospect ? " · prospect: " + esc(w.prospect) : ""}</span>
         <span class="spacer" style="flex:1"></span>
@@ -96,15 +96,15 @@ window.djSaveExtract = async function (pid, btn) {
   });
   btn.disabled = true; btn.textContent = "Saving…";
   try {
-    const r = await fetch(`${ENDPOINT}?key=${encodeURIComponent(KEY)}&what=save_extract`, {
-      method: "POST", headers: authHeaders({ "content-type": "application/json" }),
+    const r = await fetch(`${ENDPOINT}?what=save_extract`, {
+      method: "POST", headers: authHeaders({ "content-type": "application/json", "x-team-key": KEY ?? "" }),
       body: JSON.stringify({ parcel_id: pid, unit_no: g("wu").value, plomba: g("wp").checked,
         encumbrances: g("we").value, zoning: g("wz").value || null, owners })
     });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     const card = document.getElementById("wl-" + pid);
-    card.innerHTML = `<b style="color:var(--good)">Saved ✓</b> <span class="muted">folio recorded, ${d.owners_saved} owner line(s)</span>`;
+    card.innerHTML = `<b style="color:var(--good)">Saved ✓</b> <span class="muted">folio recorded, ${esc(d.owners_saved)} owner line(s)</span>`;
     setTimeout(() => card.remove(), 1500);
     loadData();
   } catch (e) { btn.disabled = false; btn.textContent = "Failed — try again (" + e.message + ")"; }
