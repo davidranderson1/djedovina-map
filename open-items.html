@@ -26,7 +26,7 @@ tr:last-child td{border-bottom:0}
 <p class="sub">Decisions, questions and features not yet done. Updated with each release.</p>
 <table>
 <tr><th>#</th><th>Item</th><th>Status</th><th>Next action</th><th>Holds it</th></tr>
-<tr><td>1</td><td>Custom domain djedovina.com serving the app at the root</td><td class="o">Open</td><td>Register the domain, then DNS root records, the CNAME file, and Enforce HTTPS</td><td class="who">David → Claude</td></tr>
+<tr><td>1</td><td>Custom domain djedovina.com serving the app at the root</td><td class="o">Open</td><td>Register at Cloudflare, then DNS root records, the CNAME file, and Enforce HTTPS</td><td class="who">David → Claude</td></tr>
 <tr><td>2</td><td>djedovina.hr through the Croatian registry</td><td class="o">Open</td><td>Claim once the Croatian company registration exists</td><td class="who">David</td></tr>
 <tr><td>3</td><td>New domain added to the sign-in redirect allow list</td><td class="o">Open</td><td>After item 1, in the database dashboard</td><td class="who">Claude</td></tr>
 <tr><td>4</td><td>Google sign-in provider switched on (team key is the fallback)</td><td class="o">Open</td><td>Decision, then enable in the dashboard</td><td class="who">David</td></tr>
@@ -34,8 +34,10 @@ tr:last-child td{border-bottom:0}
 <tr><td>6</td><td>Database backup routine confirmed (plan-dependent)</td><td class="o">Open</td><td>Check plan tier, schedule an export if needed</td><td class="who">Claude</td></tr>
 <tr><td>7</td><td>Sign-in rate-limit values recorded in the security register</td><td class="o">Open</td><td>Read from the dashboard, note in the register</td><td class="who">Claude</td></tr>
 <tr><td>8</td><td>Remove the legacy query-parameter key fallback from the data endpoint</td><td class="o">Open</td><td>One release after every device is on the rotated key</td><td class="who">Claude</td></tr>
-<tr><td>9</td><td>Security hardening release v18 (headers, escaping, pinned libraries, key rotation)</td><td class="d">Done — 14 Sep 2026</td><td>—</td><td class="who">—</td></tr>
-<tr><td>10</td><td>Row-Level Security + function lockdown on the database</td><td class="d">Done — 14 Sep 2026</td><td>—</td><td class="who">—</td></tr>
+<tr><td>9</td><td>Security headers (Content-Security-Policy + referrer) on the public landing page</td><td class="o">Open</td><td>Built and tested locally — deploy in the next push</td><td class="who">Claude</td></tr>
+<tr><td>10</td><td>Security register and audit handoff document in the project folder</td><td class="o">Open</td><td>Write to the PRIVATE project folder (secret names and rotation dates only, never values)</td><td class="who">Claude</td></tr>
+<tr><td>11</td><td>Security hardening release v18 (headers, escaping, pinned libraries, key rotation, header-borne key)</td><td class="d">Done — 14 Sep 2026</td><td>—</td><td class="who">—</td></tr>
+<tr><td>12</td><td>Row-Level Security + function lockdown on the database</td><td class="d">Done — 14 Sep 2026</td><td>—</td><td class="who">—</td></tr>
 </table>
 <p class="foot">Board format per working preference: pending items live here, not only in chat.</p>
 </main>
